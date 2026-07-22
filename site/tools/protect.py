@@ -215,44 +215,31 @@ _GATED_FORM = """  <form id="f">
     <div class="err" id="err"></div>
   </form>"""
 
-_OPEN_JS = """const DATA = "__DATA__";
-function enter() {
-  const bytes = Uint8Array.from(atob(DATA), c => c.charCodeAt(0));
-  const html = new TextDecoder().decode(bytes);
+_OPEN_JS = """function enter() {
   try { sessionStorage.setItem("expcmp_entered", "1"); } catch (e) {}
-  document.open(); document.write(html); document.close();
+  location.href = "explorer.html";
 }
 document.getElementById("f").addEventListener("submit", ev => {
   ev.preventDefault();
   enter();
 });
-/* auto-enter on return visits - but only after parsing has finished:
-   document.open() is a no-op while the parser is active, which would
-   INJECT the explorer into the landing instead of replacing it */
-function autoEnter() {
-  try { if (sessionStorage.getItem("expcmp_entered")) enter(); } catch (e) {}
-}
-if (document.readyState === "loading")
-  document.addEventListener("DOMContentLoaded", autoEnter);
-else
-  autoEnter();
+/* returning visitors skip the landing entirely */
+try {
+  if (sessionStorage.getItem("expcmp_entered")) location.replace("explorer.html");
+} catch (e) {}
 </script>
 </body>
 </html>
 """
 
 
-def landing_page(src, dst):
-    """Landing page with an Enter button; the page content is embedded
-    (base64, no encryption) and swapped in on click."""
-    with open(src, encoding='utf-8') as f:
-        html = f.read()
+def landing_page(dst):
+    """Landing page whose Enter button is a plain navigation to
+    explorer.html - no content embedding, no document.write."""
     head = TEMPLATE.split('const SALT =')[0]
     head = head.replace(_GATED_FORM, _OPEN_FORM)
-    out = head + _OPEN_JS.replace(
-        '__DATA__', base64.b64encode(html.encode('utf-8')).decode())
     with open(dst, 'w', encoding='utf-8') as f:
-        f.write(out)
+        f.write(head + _OPEN_JS)
 
 
 def encrypt_page(src, dst, password):
@@ -303,15 +290,18 @@ def main():
         print('NOTE: docs/data/* and docs/assets/* remain publicly fetchable.')
         return
 
-    # default: open landing on index.html, everything else plain
+    # default: index.html becomes the landing; the explorer is published as
+    # explorer.html and every nav link is repointed at it
     for f in pages:
-        src, dst = os.path.join(PAGES, f), os.path.join(DOCS, f)
-        if f == 'index.html':
-            landing_page(src, dst)
-        else:
-            shutil.copy2(src, dst)
-    print(f'Wrote docs/index.html landing (Enter button, no password) + '
-          f'{len(pages) - 1} plain page(s).')
+        with open(os.path.join(PAGES, f), encoding='utf-8') as fh:
+            html = fh.read()
+        html = html.replace('href="index.html"', 'href="explorer.html"')
+        out = 'explorer.html' if f == 'index.html' else f
+        with open(os.path.join(DOCS, out), 'w', encoding='utf-8') as fh:
+            fh.write(html)
+    landing_page(os.path.join(DOCS, 'index.html'))
+    print(f'Wrote docs/index.html landing (Enter -> explorer.html) + '
+          f'{len(pages)} page(s).')
 
 
 if __name__ == '__main__':
