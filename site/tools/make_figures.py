@@ -290,23 +290,32 @@ if SENS:
         hi.append(max(vals) - b)
     x = np.arange(len(labels))
     ax.bar(x, base, color=cols, width=0.62)
-    # scenario envelope as a hatched band over each footprint bar (whiskers
-    # collided with the value labels)
+    # scenario envelope: hatched band per footprint bar, hatch in the bar's
+    # own colour; baseline label on the bar, bound values small + grey
     band_lo = [b - d for b, d in zip(base[len(natives):], lo)]
     band_hi = [b + d for b, d in zip(base[len(natives):], hi)]
-    ax.bar(x[len(natives):], [h - l for l, h in zip(band_lo, band_hi)],
-           bottom=band_lo, width=0.62, facecolor='white', alpha=0.45,
-           edgecolor='#3a3a2a', linewidth=1.1, hatch='///',
-           label='range across storey rules\n(floor/ceil, divisor ±0.25 m)')
+    for j, (l, h) in enumerate(zip(band_lo, band_hi)):
+        i = len(natives) + j
+        ax.bar([i], [h - l], bottom=l, width=0.62, facecolor='white',
+               alpha=0.45, edgecolor=cols[i], linewidth=1.2, hatch='///')
+        ax.text(i + 0.36, h, '$' + format(h, ',.0f') + 'B', ha='left',
+                va='center', color='#8a8a8a', fontsize=8)
+        ax.text(i + 0.36, l, '$' + format(l, ',.0f') + 'B', ha='left',
+                va='center', color='#8a8a8a', fontsize=8)
     for i, b in enumerate(base):
-        top = b if i < len(natives) else band_hi[i - len(natives)]
-        ax.text(i, top + max(base) * 0.025, '$' + format(b, ',.0f') + 'B',
+        ax.text(i, b + max(base) * 0.025, '$' + format(b, ',.0f') + 'B',
                 ha='center', fontweight='bold', color=NAVY, fontsize=9.5)
     ax.set_xticks(x, labels)
     ax.set_ylabel(f'{usdlab}, billions')
     ax.set_ylim(0, max(max(base), max(band_hi)) * 1.18)
+    ax.set_xlim(-0.6, len(labels) - 0.25)
     ax.spines[['top', 'right']].set_visible(False)
-    ax.legend(frameon=False, loc='upper left', bbox_to_anchor=(0.0, 0.92),
+    from matplotlib.patches import Patch
+    ax.legend(handles=[Patch(facecolor='white', edgecolor='#8a8a8a',
+                             hatch='///',
+                             label='range across storey rules\n'
+                                   '(floor/ceil, divisor ±0.25 m)')],
+              frameon=False, loc='upper left', bbox_to_anchor=(0.0, 0.92),
               fontsize=8.5, handlelength=1.6)
     ax.set_title('Storey-rule sensitivity: hatched band spans integer '
                  'floor/ceil storeys and divisor ±0.25 m', fontweight='bold',
