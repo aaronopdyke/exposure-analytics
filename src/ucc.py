@@ -1,7 +1,7 @@
 """
 Exposure Analytics - GEM-derived unit construction costs (UCC, USD/m2).
 
-Source: the UCC-database compilation (github.com/aaronopdyke/UCC-database),
+Source: the UCC-database compilation (github.com/aaronopdyke/ucc-database),
 which extracts UCC = BLDG_REPL_COST_USD / TOTAL_AREA_SQM (structural +
 non-structural, EXCLUDING contents; 2021 US$) from the GEM Global Exposure
 Model per country x admin-1 x occupancy. Used here to put an estimated USD
@@ -21,7 +21,7 @@ import pandas as pd
 from src.gem import WB_CROSSWALK
 
 LOCAL_CSV = r'c:\Users\aaron\repos\UCC-database\data\ucc_adm1.csv'
-RAW_URL = ('https://raw.githubusercontent.com/aaronopdyke/UCC-database/'
+RAW_URL = ('https://raw.githubusercontent.com/aaronopdyke/ucc-database/'
            'main/data/ucc_adm1.csv')
 
 
