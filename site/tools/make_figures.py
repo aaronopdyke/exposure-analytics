@@ -290,19 +290,26 @@ if SENS:
         hi.append(max(vals) - b)
     x = np.arange(len(labels))
     ax.bar(x, base, color=cols, width=0.62)
-    ax.errorbar(x[len(natives):], base[len(natives):],
-                yerr=[lo, hi], fmt='none', ecolor='#3a3a2a',
-                elinewidth=1.6, capsize=5, capthick=1.6)
+    # scenario envelope as a hatched band over each footprint bar (whiskers
+    # collided with the value labels)
+    band_lo = [b - d for b, d in zip(base[len(natives):], lo)]
+    band_hi = [b + d for b, d in zip(base[len(natives):], hi)]
+    ax.bar(x[len(natives):], [h - l for l, h in zip(band_lo, band_hi)],
+           bottom=band_lo, width=0.62, facecolor='white', alpha=0.45,
+           edgecolor='#3a3a2a', linewidth=1.1, hatch='///',
+           label='range across storey rules\n(floor/ceil, divisor ±0.25 m)')
     for i, b in enumerate(base):
-        ax.text(i, b + max(base) * 0.03, '$' + format(b, ',.0f') + 'B',
+        top = b if i < len(natives) else band_hi[i - len(natives)]
+        ax.text(i, top + max(base) * 0.025, '$' + format(b, ',.0f') + 'B',
                 ha='center', fontweight='bold', color=NAVY, fontsize=9.5)
     ax.set_xticks(x, labels)
     ax.set_ylabel(f'{usdlab}, billions')
-    ax.set_ylim(0, max(max(base), max(b + h for b, h in
-                       zip(base[len(natives):], hi))) * 1.18)
+    ax.set_ylim(0, max(max(base), max(band_hi)) * 1.18)
     ax.spines[['top', 'right']].set_visible(False)
-    ax.set_title('Storey-rule sensitivity: whiskers span integer floor/ceil '
-                 'storeys and divisor ±0.25 m', fontweight='bold',
+    ax.legend(frameon=False, loc='upper left', bbox_to_anchor=(0.0, 0.92),
+              fontsize=8.5, handlelength=1.6)
+    ax.set_title('Storey-rule sensitivity: hatched band spans integer '
+                 'floor/ceil storeys and divisor ±0.25 m', fontweight='bold',
                  color=NAVY, fontsize=11.5)
     ax.text(0.02, 0.95, '* est. replacement value: floor area x GEM UCC',
             transform=ax.transAxes, ha='left', fontsize=8.5, color='#666')
