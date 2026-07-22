@@ -1,4 +1,4 @@
-# exposure-analytics
+# Exposure Analytics
 
 **How much is the built environment worth — and do the world's public
 building-exposure datasets agree?** Anyone doing disaster-risk work has to
