@@ -51,7 +51,7 @@ FOOTPRINT_MODELS = ['overture', 'gba', 'msb']   # get UCC-estimated values
 DOCS_LINKS = {
     'gar15': 'https://www.preventionweb.net/english/hyogo/gar/2015/en/bgdocs/risk-section/De%20Bono,%20Andrea,%20Bruno%20Chatenoux.%202015.%20A%20Global%20Exposure%20Model%20for%20GAR%202015,%20%20UNEP-GRID.pdf',
     'giri': 'https://giri.unepgrid.ch/sites/default/files/2023-09/GIRI_BEM_report_UNIGE.pdf',
-    'gem2023': 'https://doi.org/10.1177/87552930231194048',
+    'gem2023': 'https://onlinelibrary.wiley.com/doi/10.1177/87552930231194048',
     'gem2026': 'https://github.com/gem/global_exposure_model/releases/tag/v2026.0.0',
     'overture': 'https://docs.overturemaps.org/guides/buildings/',
     'gba': 'https://essd.copernicus.org/articles/17/6647/2025/essd-17-6647-2025.html',

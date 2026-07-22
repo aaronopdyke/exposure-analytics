@@ -157,12 +157,43 @@ def section_slide(prs, layout, num, title):
     return s
 
 
+COVER_IMG = os.path.join(SITE, 'deck', 'cover_skyline.png')
+
+
+def replace_cover_photo(prs):
+    """Swap the Cover layout's 'Photograph' picture for COVER_IMG,
+    center-cropped to the frame's aspect so nothing stretches."""
+    if not os.path.exists(COVER_IMG):
+        print('cover image not found, keeping template photo:', COVER_IMG)
+        return
+    import io
+    from PIL import Image
+    layout = prs.slides[0].slide_layout
+    pic = next(sh for sh in layout.shapes
+               if sh.shape_type == 13 and sh.name == 'Photograph')
+    frame_aspect = pic.width / pic.height
+    img = Image.open(COVER_IMG).convert('RGB')
+    w, h = img.size
+    if w / h > frame_aspect:      # too wide - crop sides
+        new_w = int(h * frame_aspect)
+        img = img.crop(((w - new_w) // 2, 0, (w + new_w) // 2, h))
+    else:                          # too tall - crop top/bottom
+        new_h = int(w / frame_aspect)
+        img = img.crop((0, (h - new_h) // 2, w, (h + new_h) // 2))
+    buf = io.BytesIO()
+    img.save(buf, 'PNG')
+    rId = pic._element.blip_rId
+    layout.part.related_part(rId)._blob = buf.getvalue()
+    print('cover photo replaced with', COVER_IMG)
+
+
 shutil.copy2(TEMPLATE, OUT)
 prs = Presentation(OUT)
 # keep Cover (idx 0) and the light full-text disclaimer variant (idx 21,
 # layout "Acknowledgements and disclaimers 7" - wording lives on the layout
 # and is preserved untouched)
 keep_only(prs, {0, 21})
+replace_cover_photo(prs)
 lay = layout_by_name(prs, 'Content slide 1')
 
 # ---- cover ----------------------------------------------------------------
@@ -173,63 +204,6 @@ for ph in prs.slides[0].placeholders:
         ph.text_frame.text = 'Comparing Building Exposure Models'
     elif ph.has_text_frame:
         ph.text_frame.text = CTY
-
-# ---- section 1: the comparison --------------------------------------------
-section_slide(prs, lay, 1, 'Comparing the totals')
-
-native = [T['gar15_usd_adj'], T['giri_total_usd_adj'],
-          T['gem23_bldg_repl_usd_adj'], T['gem26_bldg_repl_usd_adj']]
-ratio = max(native) / min(native)
-s = content_slide(prs, lay, 'Country totals by model')
-pic_fit(s, os.path.join(FIG, 'bars_totals.png'), 0.6, 1.45, 12.1, 4.35)
-text_block(s, 0.75, 5.95, 11.8, [
-    (f"After price-year alignment: GAR15 {B(T['gar15_usd_adj'])} · GIRI "
-     f"{B(T['giri_total_usd_adj'])} · GEM v2023 "
-     f"{B(T['gem23_bldg_repl_usd_adj'])} · GEM v2026 "
-     f"{B(T['gem26_bldg_repl_usd_adj'])}. All figures are structures-only "
-     '(GEM contents dropped). The remaining spread is method, not price '
-     'levels - see the vintage slide.', 12.5, False, GREY, 8),
-    ('With GBA-calibrated storeys the three footprint estimates now sit '
-     f"between {B(min(T['overture_value_usd_adj'], T['msb_value_usd_adj']))} "
-     f"and {B(T['gba_value_usd_adj'])} - same buildings, different height "
-     'treatment.', 12.5, False, GREY, 0),
-])
-
-VG = meta['vintages']['value_growth']
-FG = meta['vintages']['floor_growth']
-s = content_slide(prs, lay,
-                  f'Country totals, grown to {YR} for growth since each '
-                  'model\'s vintage')
-pic_fit(s, os.path.join(FIG, 'bars_totals_grown.png'), 0.6, 1.45, 12.1, 4.35)
-text_block(s, 0.75, 5.95, 11.8, [
-    ('Identical charts to the previous slide, but each model is grown from '
-     'its data vintage: values along the WB produced-capital path (CWON '
-     f"NW.PCA.TO, ~{VG['trailing_cagr']:.1%}/yr recently), floor areas at "
-     f"the GHSL built-up-volume rate (~{FG['rate']:.1%}/yr). "
-     f"GAR15 (2011 inputs, x{VG['factors']['gar15']:.2f}) jumps to "
-     f"{B(T['gar15_usd_adj'] * VG['factors']['gar15'])}.",
-     12.5, False, GREY, 8),
-    ('Growing every model to a common stock year makes the spread WIDER, '
-     'not narrower - the disagreements are about method, not vintage. '
-     'Factors of x1.00 mean the data already reflects ' + str(YR) + '.',
-     12.5, False, GREY, 0),
-])
-
-s = content_slide(prs, lay, 'Regional breakdown by WB Admin-1 unit')
-pic_fit(s, os.path.join(FIG, 'adm1_grouped.png'), 0.5, 1.4, 7.6, 5.6)
-text_block(s, 8.35, 1.7, 4.6, [
-    ('Same top regions in all three models', 15, True, NAVY, 8),
-    ('–  Casablanca–Settat leads in every model, followed by '
-     'Rabat–Salé–Kénitra and Marrakech–Safi.', 12.5, False, GREY, 7),
-    ('–  Disagreement concentrates in secondary regions — GEM '
-     'is notably lower in the south and east.', 12.5, False, GREY, 7),
-    ('–  Western Sahara (hatched unit): small in all models; GEM '
-     'values come from its two southern regions via the boundary '
-     'crosswalk.', 12.5, False, GREY, 7),
-])
-
-# ---- section 2: the models ------------------------------------------------
-section_slide(prs, lay, 2, 'The models evaluated')
 
 # ---- overview: what is being compared -------------------------------------
 def _box(slide, x, y, w, h, fill, line=None):
@@ -297,6 +271,63 @@ _box(s, _x0, 6.85, 3 * _w + 2 * _gap, 0.52, TINT)
 text_block(s, _x0 + 0.2, 6.95, 3 * _w + 2 * _gap - 0.4, [
     (f'All seven aligned to WB Official Boundaries Admin-1 · {USD} · '
      'structures only (contents excluded everywhere)', 12, True, NAVY, 0)])
+
+# ---- section 1: the comparison --------------------------------------------
+section_slide(prs, lay, 1, 'Comparing the totals')
+
+native = [T['gar15_usd_adj'], T['giri_total_usd_adj'],
+          T['gem23_bldg_repl_usd_adj'], T['gem26_bldg_repl_usd_adj']]
+ratio = max(native) / min(native)
+s = content_slide(prs, lay, 'Country totals by model')
+pic_fit(s, os.path.join(FIG, 'bars_totals.png'), 0.6, 1.45, 12.1, 4.35)
+text_block(s, 0.75, 5.95, 11.8, [
+    (f"After price-year alignment: GAR15 {B(T['gar15_usd_adj'])} · GIRI "
+     f"{B(T['giri_total_usd_adj'])} · GEM v2023 "
+     f"{B(T['gem23_bldg_repl_usd_adj'])} · GEM v2026 "
+     f"{B(T['gem26_bldg_repl_usd_adj'])}. All figures are structures-only "
+     '(GEM contents dropped). The remaining spread is method, not price '
+     'levels - see the vintage slide.', 12.5, False, GREY, 8),
+    ('With GBA-calibrated storeys the three footprint estimates now sit '
+     f"between {B(min(T['overture_value_usd_adj'], T['msb_value_usd_adj']))} "
+     f"and {B(T['gba_value_usd_adj'])} - same buildings, different height "
+     'treatment.', 12.5, False, GREY, 0),
+])
+
+VG = meta['vintages']['value_growth']
+FG = meta['vintages']['floor_growth']
+s = content_slide(prs, lay,
+                  f'Country totals, grown to {YR} for growth since each '
+                  'model\'s vintage')
+pic_fit(s, os.path.join(FIG, 'bars_totals_grown.png'), 0.6, 1.45, 12.1, 4.35)
+text_block(s, 0.75, 5.95, 11.8, [
+    ('Identical charts to the previous slide, but each model is grown from '
+     'its data vintage: values along the WB produced-capital path (CWON '
+     f"NW.PCA.TO, ~{VG['trailing_cagr']:.1%}/yr recently), floor areas at "
+     f"the GHSL built-up-volume rate (~{FG['rate']:.1%}/yr). "
+     f"GAR15 (2011 inputs, x{VG['factors']['gar15']:.2f}) jumps to "
+     f"{B(T['gar15_usd_adj'] * VG['factors']['gar15'])}.",
+     12.5, False, GREY, 8),
+    ('Growing every model to a common stock year makes the spread WIDER, '
+     'not narrower - the disagreements are about method, not vintage. '
+     'Factors of x1.00 mean the data already reflects ' + str(YR) + '.',
+     12.5, False, GREY, 0),
+])
+
+s = content_slide(prs, lay, 'Regional breakdown by WB Admin-1 unit')
+pic_fit(s, os.path.join(FIG, 'adm1_grouped.png'), 0.5, 1.4, 7.6, 5.6)
+text_block(s, 8.35, 1.7, 4.6, [
+    ('Same top regions in all three models', 15, True, NAVY, 8),
+    ('–  Casablanca–Settat leads in every model, followed by '
+     'Rabat–Salé–Kénitra and Marrakech–Safi.', 12.5, False, GREY, 7),
+    ('–  Disagreement concentrates in secondary regions — GEM '
+     'is notably lower in the south and east.', 12.5, False, GREY, 7),
+    ('–  Western Sahara (hatched unit): small in all models; GEM '
+     'values come from its two southern regions via the boundary '
+     'crosswalk.', 12.5, False, GREY, 7),
+])
+
+# ---- section 2: the models ------------------------------------------------
+section_slide(prs, lay, 2, 'The models evaluated')
 
 # ---- one slide per model --------------------------------------------------
 model_slide(prs, lay, 'GAR15 — UNISDR Global Exposure Dataset (2015)',

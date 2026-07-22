@@ -261,7 +261,7 @@
     ]
    },
    "note": "June 2023 GEM release: building replacement cost (structural + non-structural, excl. contents). GEM regions matched to WB Admin-1 boundaries; GEM's two southern regions are assigned to the WB Western Sahara unit. No urban/rural split in this release.",
-   "docs": "https://doi.org/10.1177/87552930231194048"
+   "docs": "https://onlinelibrary.wiley.com/doi/10.1177/87552930231194048"
   },
   "gem2026": {
    "label": "GEM v2026.0.0",
