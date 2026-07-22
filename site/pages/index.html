@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exposure Comparison</title>
+<meta name="description" content="Compare building-exposure models (GAR15, GIRI, GEM v2023/v2026, Overture, GBA, Microsoft) for a target country on World Bank Admin-1 units.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%A2%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.0/dist/maplibre-gl.min.css">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="brand">Exposure Comparison <span></span></div>
+  <nav>
+    <a href="index.html" class="active">Explorer</a>
+    <a href="about.html">About</a>
+  </nav>
+</header>
+
+<div class="explorer">
+  <aside class="controls">
+    <div class="ctl">
+      <label>Mode</label>
+      <div class="seg" id="mode-seg">
+        <button data-mode="single" class="on">Single model</button>
+        <button data-mode="compare">Compare models</button>
+      </div>
+    </div>
+    <div class="ctl">
+      <label>Metric</label>
+      <div class="seg" id="metric-seg">
+        <button data-metric="value" class="on">Value (USD)</button>
+        <button data-metric="floor">Floor area (m²)</button>
+      </div>
+    </div>
+    <div class="ctl">
+      <label>Class</label>
+      <div class="seg" id="class-seg">
+        <button data-class="total" class="on">Total</button>
+        <button data-class="urban">Urban</button>
+        <button data-class="rural">Rural</button>
+      </div>
+    </div>
+    <div class="ctl" id="single-ctl">
+      <label for="model-sel">Model</label>
+      <select id="model-sel"></select>
+      <div id="giri-sub" class="sub hidden">
+        <label for="giri-sel">GIRI layer</label>
+        <select id="giri-sel">
+          <option value="total">Total</option>
+          <option value="res">Residential</option>
+          <option value="nres">Non-residential</option>
+        </select>
+      </div>
+    </div>
+    <div class="ctl hidden" id="compare-ctl">
+      <label for="model-a">Model A</label>
+      <select id="model-a"></select>
+      <label for="model-b">Model B</label>
+      <select id="model-b"></select>
+      <div class="seg" id="diff-seg">
+        <button data-diff="abs" class="on">A − B</button>
+        <button data-diff="pct">% vs B</button>
+      </div>
+    </div>
+    <div class="ctl">
+      <label>Vintage adjustment</label>
+      <div class="seg" id="grow-seg">
+        <button data-grow="off" class="on">Base year</button>
+        <button data-grow="on">Grown</button>
+      </div>
+      <div class="grow-note" id="grow-note"></div>
+    </div>
+    <div class="note" id="model-note"></div>
+    <div class="panel" id="totals-panel">
+      <h3 id="totals-title">Country totals</h3>
+      <div id="totals-bars"></div>
+    </div>
+  </aside>
+
+  <main class="map-wrap">
+    <div class="map-stage">
+      <div id="map"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <section class="breakdown" id="breakdown">
+      <div class="breakdown-head">
+        <h3 id="breakdown-title">Composition</h3>
+        <button id="scope-reset" class="chip hidden">↩ country total</button>
+        <div class="seg mini" id="break-seg">
+          <button data-break="share" class="on">share %</button>
+          <button data-break="abs">absolute</button>
+        </div>
+      </div>
+      <div id="breakdown-bars"></div>
+      <div class="breakdown-hint">Click a region on the map to rescope this
+        chart; segments show each model's own composition (urban/rural,
+        res/non-res, or res/com/ind).</div>
+    </section>
+  </main>
+</div>
+
+<footer class="site-footer">
+  © Aaron Opdyke · GAR15 (UNISDR/UNEP-GRID) · GIRI BEM (UNEP/GRID-Geneva) ·
+  <a href="https://github.com/gem/global_exposure_model">GEM</a> ·
+  Overture Maps (ODbL) · GBA LoD1 (TUM) · Microsoft GlobalML · WB Official Boundaries ·
+  <span data-meta-line></span> · <a href="about.html">Method &amp; caveats</a>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.0/dist/maplibre-gl.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

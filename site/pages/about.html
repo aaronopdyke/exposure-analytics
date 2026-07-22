@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exposure Comparison</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%A2%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="brand">Exposure Comparison <span></span></div>
+  <nav>
+    <a href="index.html">Explorer</a>
+    <a href="about.html" class="active">About</a>
+  </nav>
+</header>
+
+<div class="content">
+<h1>Methodology</h1>
+<p>This site compares seven building-exposure datasets for a target country on
+a single map, aggregated to <strong>World Bank Official Boundaries Admin-1
+units</strong>. The methodology below is country-agnostic; where concrete
+numbers appear they come from the <em>current build</em> (Morocco) and are
+labelled as such.
+Two are top-down models (GAR15, GIRI), two are releases of a bottom-up
+engineering exposure model (GEM v2023.1.1 and v2026.0.0), and three are
+building-by-building maps (Overture, Global Building Atlas, Microsoft). They
+answer subtly different questions, so differences between them are expected
+and informative — and the <em>vintage analysis</em> below separates
+differences that are just data age from differences that are fundamental.</p>
+
+<h2>Datasets</h2>
+<table>
+<tr><th>Model</th><th>Vintage (price base)</th><th>Native form</th><th>What "value" means</th><th>Access &amp; technical docs</th></tr>
+<tr><td><b>GAR15</b> (UNISDR GEG-15)</td><td>2015 release, ~2011 inputs (<b>2005 US$</b>)</td>
+  <td>~5&nbsp;km point grid (1&nbsp;km at the coast)</td>
+  <td>Capital stock of buildings (structures; <em>no contents</em>), downscaled
+      from World Bank produced capital; native urban/rural split</td>
+  <td><a href="https://data.humdata.org/dataset/gar15-global-exposure-dataset-for-morocco">HDX shapefiles</a> ·
+      <a href="https://www.preventionweb.net/english/hyogo/gar/2015/en/bgdocs/risk-section/De%20Bono,%20Andrea,%20Bruno%20Chatenoux.%202015.%20A%20Global%20Exposure%20Model%20for%20GAR%202015,%20%20UNEP-GRID.pdf">De Bono &amp; Chatenoux (2015)</a></td></tr>
+<tr><td><b>GIRI</b> BEM</td><td>~2023 release, ~2020 inputs (<b>2018 US$</b>)</td>
+  <td>5×5&nbsp;km global rasters</td>
+  <td>Capital stock of buildings (structures; <em>no contents</em>) derived from
+      World Bank produced capital — the BEM report calls this "building stock
+      value"; residential and non-residential layers</td>
+  <td><a href="https://giri.unepgrid.ch">giri.unepgrid.ch</a> ·
+      <a href="https://giri.unepgrid.ch/sites/default/files/2023-09/GIRI_BEM_report_UNIGE.pdf">BEM technical report (2023)</a></td></tr>
+<tr><td><b>GEM v2023.1.1</b></td><td>June 2023 release (<b>2021 US$</b>)</td>
+  <td>Per-country ADM1 × occupancy summary</td>
+  <td>Replacement cost of buildings (structural + non-structural,
+      <em>excl. contents</em>); no urban/rural split in this release</td>
+  <td><a href="https://github.com/gem/global_exposure_model/releases/tag/2023.1.1">release</a> ·
+      <a href="https://doi.org/10.1177/87552930231194048">Yepes-Estrada et al. (2023)</a></td></tr>
+<tr><td><b>GEM v2026.0.0</b></td><td>June 2026 release (<b>2024 US$</b>)</td>
+  <td>Global ADM1 × occupancy × taxonomy summary</td>
+  <td>As above, with counts/population updated to 2025 and replacement costs
+      re-based to 2024–25; urban/rural published for residential only</td>
+  <td><a href="https://github.com/gem/global_exposure_model/releases/tag/v2026.0.0">release notes</a> ·
+      <a href="https://github.com/gem/global_exposure_model">repository</a></td></tr>
+<tr><td><b>Overture Maps</b></td><td>2026-06 release</td>
+  <td>Per-building footprints (OSM, Microsoft, Google and others)</td>
+  <td>No native value — replacement value <em>estimated</em> from floor area ×
+      GEM unit construction costs (below)</td>
+  <td><a href="https://docs.overturemaps.org/guides/buildings/">buildings schema docs</a></td></tr>
+<tr><td><b>Global Building Atlas</b> LoD1 (TUM)</td><td>~2024</td>
+  <td>Per-building footprints + modelled heights</td>
+  <td>No native value — replacement value <em>estimated</em> (floor area ×
+      GEM UCC)</td>
+  <td><a href="https://source.coop/tge-labs/globalbuildingatlas-lod1">source.coop</a> ·
+      <a href="https://essd.copernicus.org/articles/17/6647/2025/essd-17-6647-2025.html">GlobalBuildingAtlas paper (ESSD 2025)</a></td></tr>
+<tr><td><b>Microsoft Buildings</b> (GlobalML)</td><td>2026-02 release</td>
+  <td>Per-building footprints; a height field exists but is unmodelled (−1)
+      throughout Morocco</td>
+  <td>No native value — replacement value <em>estimated</em> (floor area ×
+      GEM UCC)</td>
+  <td><a href="https://github.com/microsoft/GlobalMLBuildingFootprints">GlobalMLBuildingFootprints docs</a></td></tr>
+</table>
+<p class="small">Dataset availability is re-checked per country. Google Open
+Buildings v3 is excluded from the current build: it has essentially no
+Morocco coverage (77 buildings in the whole country partition).</p>
+
+<h2>Price-year alignment (constant US$)</h2>
+<p>The models publish USD of different base years, so every monetary figure on
+this site is converted to <strong>constant latest-year US$</strong> with the
+World Bank WDI <em>US GDP deflator</em> (<code>NY.GDP.DEFL.ZS</code>, country
+USA; target year and per-model factors are recorded per country in
+<code>data/&lt;ISO&gt;/meta.json</code>):</p>
+<table>
+<tr><th>Model</th><th>Native price base</th><th>Evidence</th></tr>
+<tr><td>GAR15</td><td>2005 US$</td><td>GEG-15 metadata: WB (2011) "current
+  (2005) capital stock of machinery and structures"</td></tr>
+<tr><td>GIRI BEM</td><td>2018 US$</td><td>BEM technical report: WB produced
+  capital "constant 2018 US dollars"</td></tr>
+<tr><td>GEM v2023.1.1</td><td>2021 US$</td>
+  <td>Yepes-Estrada et al. (2023)</td></tr>
+<tr><td>GEM v2026.0.0 (and the UCC used for estimated replacement
+  values)</td>
+  <td>2024 US$</td><td>v2026 release notes: replacement costs "updated to
+  2024–2025 values"</td></tr>
+</table>
+<p class="small">Nominal (native-year) columns are retained in the published
+GeoJSON alongside the <code>_adj</code> constant-dollar columns. A US deflator
+is used because all sources are expressed in USD; no currency conversion is
+involved.</p>
+
+<h2>Does data age explain the gaps? (vintage analysis)</h2>
+<p>Even in constant dollars the datasets describe the building stock of
+different years — GAR15's inputs are ~2011, GIRI's ~2020, GBA's ~2023, GEM
+v2026's 2025. The explorer's <strong>"Vintage adjustment" toggle</strong> (and
+the deck's vintage slides) grow each dataset from its own data vintage to the
+latest year, using two data-driven rates instead of a guessed constant:</p>
+<table>
+<tr><th>Metric</th><th>Growth basis (computed per country)</th><th>Rate
+  (current build: Morocco)</th></tr>
+<tr><td>Value (USD)</td>
+  <td><b>WB Wealth Accounts produced capital</b> (<code>NW.PCA.TO</code>, real
+  chained 2019 US$) — the same CWON series GAR15 and GIRI are derived from,
+  so growing GAR15 along it and comparing to GIRI isolates pure method
+  differences. Values follow the actual stock path 1995–2020 and extrapolate
+  at the trailing-10-year CAGR beyond it.</td>
+  <td>≈5.7%/yr (trailing decade)</td></tr>
+<tr><td>Floor area (m²)</td>
+  <td><b>GHSL Built-up Volume</b> growth (2010→2020) — the closest physical
+  proxy for floor space. Real capital grows much faster than floor area
+  because it includes quality upgrading and capital deepening, so the two
+  metrics deliberately use different rates.</td>
+  <td>≈1.5%/yr</td></tr>
+</table>
+<p><strong>Why toggle it?</strong> To test whether a gap between two models is
+just data age. By default the site shows each model's own base-year values;
+switching to "grown" answers <em>"what would this dataset say about today's
+stock if its method were left unchanged?"</em>. The result: age adjustment
+does <strong>not</strong> collapse the differences — GAR15 grown from 2011
+along its own source series <em>overshoots</em> GIRI, and both
+produced-capital models stay well above GEM's engineering replacement costs.
+The gaps are mostly <strong>method and valuation basis</strong>, not vintage.
+The exception is GEM v2023 → v2026, where stock growth plus the 2024–25 cost
+re-basing explains most of the change. Models whose data already reflects the
+latest year (GEM v2026, Overture) have a growth factor of ×1.00 and do not
+move.</p>
+<p><strong>Sanity check — does the value/floor wedge match GEM's own
+repricing?</strong> The two rates imply the stock's average real value per m²
+rises ≈4.2%/yr (1.057 / 1.015). GEM's releases test this independently
+(numbers from the current build, Morocco):
+implied national unit cost (replacement value ÷ floor area) went from
+$244/m² (2021 US$, v2023) to $320/m² (2024 US$, v2026) — +31% nominal, or
+≈4.8%/yr in real terms after the US deflator (×1.138 over 2021→2024). So
+GEM's own repricing slightly exceeds the wedge, and the 5.7%/yr value path is
+if anything mildly conservative. (Caveat: 2021–2024 spans the post-COVID
+construction-cost spike, so the long-run wedge is likely somewhat smaller;
+"real" is net of general inflation, so the wedge includes construction costs
+outpacing the deflator as well as quality/composition upgrading.)</p>
+
+<h2>Estimated replacement values for the footprint datasets (GEM UCC)</h2>
+<p>Overture, GBA and Microsoft map buildings but carry no monetary value.
+Their "value" layers here are <strong>estimated replacement values</strong>:</p>
+<p style="text-align:center"><em>estimated replacement value = floor area ×
+ADM1 unit construction cost (UCC)</em></p>
+<p>UCC (USD/m², 2024 US$) comes from the
+<a href="https://github.com/aaronopdyke/UCC-database">UCC-database</a>
+compilation of the GEM exposure model — <code>BLDG_REPL_COST_USD /
+TOTAL_AREA_SQM</code> per GEM admin-1, all occupancies combined (current
+build: Morocco ranges $292–329/m²). It excludes contents, consistent with
+GAR15/GIRI. GEM
+admin-1 UCCs are mapped to WB units via the region matching below; Western
+Sahara uses the area-weighted UCC of GEM's two southern regions.</p>
+
+<h2>Floor area and storey estimation</h2>
+<p>GEM reports floor area directly. For the building maps it is derived:</p>
+<ul class="small">
+<li><b>GBA</b> has modelled heights for nearly every building: floor area =
+footprint × storeys via a three-tier storey height (&lt;18&nbsp;m: 3.0&nbsp;m,
+&lt;60&nbsp;m: 3.25&nbsp;m, else 3.5&nbsp;m per storey); missing heights count
+as one storey.</li>
+<li><b>Overture</b> and <b>Microsoft</b> are effectively footprint-only
+datasets in the current build (Morocco) — Overture's
+<code>num_floors</code>/<code>height</code> are rarely populated and
+Microsoft's height field is −1 everywhere. Where attributes exist they are
+used; for the remainder, storeys are <strong>estimated with a GBA-calibrated
+multiplier</strong>: the GBA floor-area/footprint ratio computed per ADM1 unit
+and urban/rural class, applied to each dataset's unattributed footprint. This
+replaces the earlier 1-storey assumption with the local storey profile of the
+one source that has heights.</li>
+</ul>
+<p class="small"><strong>How sensitive are totals to the storey rules?</strong>
+The build recomputes the footprint models under four alternative rules —
+integer storeys rounded down (min&nbsp;1), rounded up, and the storey divisor
+shifted ±0.25&nbsp;m — and records the envelope in each country's
+<code>meta.json</code> (<code>sensitivity</code> block). Current build
+(Morocco): the extreme rules move footprint-model totals by roughly
+−8% (integer storeys rounded down) to +29% (rounded up), with the divisor
+shifts contributing ±8–9% — far less than the ~2.7× spread between exposure
+models, so the storey convention does not change which models sit high or
+low.</p>
+
+<h2>Boundaries: one display standard</h2>
+<p>All comparisons are displayed on <strong>WB Official Boundaries Admin-1</strong>.
+The following applies to builds that include Morocco:
+WB draws Morocco ending at 27.67°N and carries Western Sahara only as an
+ADM0 polygon (ISO <code>ESH</code>, "non-determined legal status area") with no
+ADM1 subdivisions. Maps here therefore show Western Sahara as
+<strong>one whole, hatched unit</strong> (<code>ESH000</code>) appended to the
+Morocco display — never subdivided and never merged into a member state.
+A consequence worth knowing: WB retains a small sliver of
+<em>Laâyoune-Sakia al Hamra</em> north of 27.67°N (<code>MAR007</code>), which is why
+that unit shows very small totals in every dataset.</p>
+
+<h2>Reconciling ADM1 where boundary sets differ</h2>
+<p>The models do not share an admin-1 geography, so each is brought onto the WB
+units with a method suited to its native form:</p>
+<table>
+<tr><th>Model</th><th>Native geography</th><th>Reconciliation to WB ADM1</th></tr>
+<tr><td>GAR15</td><td>Grid points, per-country files</td>
+  <td>Point-in-polygon; points whose centres fall just offshore (1&nbsp;km coastal
+  cells) recovered by a bounded nearest join (≤0.1°). The separate ESH file
+  supplies <code>ESH000</code>. Assignment loss ≈ 0%.</td></tr>
+<tr><td>GIRI</td><td>Global 5&nbsp;km raster</td>
+  <td>Each cell assigned <em>wholly</em> to the WB unit it overlaps most
+  (largest-intersection rule) — keeps coastal cells, avoids double counting,
+  and deliberately has <em>no</em> nearest-neighbour fallback so cells from
+  Algeria/Spain/the Canaries cannot leak in.</td></tr>
+<tr><td>GEM (both releases)</td><td>Own ADM1: the 12 official Moroccan
+  regions, <em>including</em> the far south</td>
+  <td>A curated <strong>region-matching table</strong> maps each GEM region to
+  its WB counterpart — by GEM's region <em>codes</em> for v2026
+  (ISO-3166-2 style, <code>MA-01…MA-12</code>) and by normalised region
+  <em>names</em> for v2023 (whose codes are GADM-style). Ten regions map 1:1;
+  GEM's two southern regions (Laâyoune-Sakia El Hamra, Dakhla-Oued Ed-Dahab)
+  lie almost wholly south of the WB 27.67°N line and are assigned to
+  <code>ESH000</code>. By construction the WB <code>MAR007</code> sliver shows
+  no GEM value.</td></tr>
+<tr><td>Overture / GBA / Microsoft</td><td>Individual buildings</td>
+  <td>Building <em>centroid</em>-in-polygon, evaluated inside DuckDB against the
+  full-resolution WB polygons.</td></tr>
+</table>
+
+<h2>Urban / rural classification</h2>
+<p><strong>What "urban/rural exists for residential only" means for GEM
+v2026:</strong> GEM publishes its summary rows as ADM1 × occupancy. For
+<em>residential</em> buildings each row is tagged URBAN or RURAL; for
+<em>commercial and industrial</em> buildings GEM publishes only totals with
+no settlement tag. So a "GEM urban" figure on this site is the urban share of
+GEM's <em>residential</em> stock only (commercial/industrial value still
+appears in totals and in the res/com/ind breakdown chart). The v2023 release
+publishes no settlement split at all.</p>
+<table>
+<tr><th>Model</th><th>How the split is obtained</th></tr>
+<tr><td>GAR15</td><td>Native: urban (<code>tot_cu</code>) and rural
+  (<code>tot_cr</code>) capital columns, all sectors.</td></tr>
+<tr><td>GEM v2026</td><td>Native but <strong>residential only</strong> (see
+  above); v2023 has none.</td></tr>
+<tr><td>Overture, GBA, Microsoft</td><td>Assigned by this project: each
+  building's 1&nbsp;km Mollweide grid cell is looked up in <strong>GHSL Degree
+  of Urbanisation (DEGURBA) E2020, R2025A</strong>; classes 21/22/23/30
+  (suburban through urban centre) count as <em>urban</em>, classes 11–13 (and
+  water) as <em>rural</em>.</td></tr>
+<tr><td>GIRI</td><td>Not split — GIRI publishes residential / non-residential
+  layers instead, shown as sub-layers in single-model mode and in the
+  breakdown chart.</td></tr>
+</table>
+
+<h2>Comparability caveats</h2>
+<ul class="small">
+<li><b>Value definitions differ</b>: GAR15/GIRI are the capital stock of
+buildings downscaled from national produced capital; GEM is engineering
+replacement cost; Overture/GBA/Microsoft are estimated replacement values
+(floor area × UCC). None equals market or insured value. All exclude
+contents — so figures here are <em>lower</em> than GEM's own published
+country totals, which include a contents column (current build: GEM v2026
+Morocco = $271B structures shown here vs $323B incl. $52B contents on GEM's
+site).</li>
+<li><b>Vintages differ</b> even after price-year alignment — see the vintage
+analysis above for how much that explains (little, between methods; most,
+between GEM releases).</li>
+<li><b>Completeness differs fundamentally</b>: the footprint datasets count
+<em>mapped</em> buildings; the models distribute national aggregates, so they
+include what mapping misses (and vice versa).</li>
+<li>All zonal work uses centroid / largest-overlap assignment as above; totals
+exclude features outside the WB coastline generalisation.</li>
+<li><b>Access</b>: the site is open — the explorer sits behind a simple
+landing page, and the files under <code>data/</code> and <code>assets/</code>
+(aggregated ADM1 statistics from public datasets) are fetchable by direct
+URL.</li>
+</ul>
+
+<h2>Acknowledgements</h2>
+<p class="small">This work was supported by a AAAS Revelle Fellowship
+(American Association for the Advancement of Science).</p>
+
+<h2>Licenses &amp; citations</h2>
+<p class="small">GAR15: UNISDR/UNEP-GRID (non-commercial; De Bono &amp;
+Chatenoux, 2015). GIRI BEM: UNEP/GRID-Geneva (Piller, Benvenuti &amp; De Bono,
+2023). GEM Global Exposure Model: CC BY-NC-SA (Yepes-Estrada et al., 2023;
+GEM Foundation v2026.0.0); UCC via the UCC-database compilation. Overture
+Maps: ODbL and source-specific licences. Global Building Atlas: TU Munich
+(Zhu et al., 2025). Microsoft GlobalML Building Footprints: ODbL. Boundaries:
+World Bank Official Boundaries. Urbanisation: GHSL DEGURBA R2025A (JRC).
+Deflator: World Bank WDI.</p>
+</div>
+
+<footer class="site-footer">
+  © Aaron Opdyke · built from the
+  <a href="https://github.com/aaronopdyke/exposure-analytics">exposure-analytics</a>
+  pipeline · <span data-meta-line></span>
+</footer>
+<script>
+fetch("data/MAR/meta.json").then(r => r.json()).then(m => {
+  document.querySelectorAll("[data-meta-line]").forEach(el => {
+    el.textContent = "Data built " + (m.generated || "") +
+      " · values in constant " + m.deflator.target_year + " US$";
+  });
+  var short = (m.country || "").split(" (")[0];
+  if (short) document.querySelectorAll(".brand span").forEach(el => {
+    el.textContent = "· " + short;
+  });
+}).catch(() => {});
+</script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+# =========================================================================
+# Exposure Analytics - configuration
+#
+# Compares five building-exposure datasets: GAR15, GIRI, GEM, GBA, Overture.
+# Data stays on Drive under "World Bank/Exposure Analytics" (auto-detected);
+# shared inputs (WB boundaries, GHSL) and the GBA/Overture extractions are
+# reused from the sibling "Global Building Forecast" project.
+# =========================================================================
+
+country_iso: "MAR"
+data_root: null            # null -> auto-detect (env DATA_ROOT / Colab / G:)
+
+boundaries:
+  # WB Official Boundaries stop Morocco at 27.67N; Western Sahara exists only
+  # as an ADM0 polygon (ESH, "Non-determined legal status area") with NO ADM1
+  # subdivisions. include_esh appends it to country maps as ONE whole unit.
+  include_esh: true
+  esh_label: "Western Sahara (no ADM1 subdivisions - WB non-determined status)"
+
+sources:
+  gar15:   # UNISDR GAR15 Global Exposure Dataset (GEG-15), ~5km (1km coast)
+    # per-country downloads, resolved by ISO3 via the HDX CKAN API
+    # (package_search fq=groups:{iso}); e.g. Morocco:
+    # https://data.humdata.org/dataset/gar15-global-exposure-dataset-for-morocco
+    # world: https://earthworks.stanford.edu/catalog/stanford-nd563yc9685
+    # values in MILLIONS of 2015 USD (tot_val = tot_cu + tot_cr)
+    cache_subdir: "GAR15"
+  giri:    # GIRI Building Exposure Model (BEM), 5x5km value rasters (USD)
+    # portal: https://giri.unepgrid.ch  (res / non-res building stock USD)
+    # direct GeoTIFFs (global, EPSG:4326, ~0.0417 deg, nodata -9999):
+    base_url: "https://hazards-data.unepgrid.ch/"
+    files:
+      total: "bem_5x5_valfis.tif"
+      res: "bem_5x5_valfis_res.tif"
+      nres: "bem_5x5_valfis_nres.tif"
+    cache_subdir: "GIRI"
+  gem:     # GEM Global Exposure Model - ADM1 x taxonomy summary
+    adm1_taxonomy_url: "https://raw.githubusercontent.com/gem/global_exposure_model/main/World/summaries/Exposure_Summary_Adm1_Taxonomy.csv"
+    cache_subdir: "GEM"
+  gba:     # Global Building Atlas LoD1 (source.coop parquet tiles, DuckDB)
+    base_url: "https://data.source.coop/tge-labs/globalbuildingatlas-lod1"
+    s3_pattern: "s3://us-west-2.opendata.source.coop/tge-labs/globalbuildingatlas-lod1/*.parquet"
+  overture:  # Overture Maps buildings (pinned release, DuckDB over S3)
+    url: "s3://overturemaps-us-west-2/release/2026-06-17.0/theme=buildings/type=building/*"

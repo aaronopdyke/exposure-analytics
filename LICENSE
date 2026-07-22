@@ -1,0 +1,44 @@
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+(CC BY-NC-SA 4.0)
+
+Copyright (c) 2026 Aaron Opdyke
+
+This repository — the code, the published comparison site and its data files
+(docs/), the figures, and the slide deck — is licensed under CC BY-NC-SA 4.0.
+You are free to share and adapt it for NON-COMMERCIAL purposes, provided you
+give attribution and license your derivatives under the same terms.
+
+Full legal text: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+
+Why this license
+----------------
+The published statistics are derived from third-party exposure datasets, and
+the most restrictive of them govern what any derivative can be: the GEM
+Global Exposure Model is CC BY-NC-SA 4.0 (share-alike + non-commercial) and
+GAR15 is distributed under UNISDR/UNEP-GRID non-commercial terms. This
+repository therefore adopts CC BY-NC-SA 4.0 as a whole so its outputs comply
+with those upstream terms.
+
+Third-party data notices
+------------------------
+The underlying datasets remain under their own licenses; using this
+repository's outputs also requires complying with them:
+
+- GAR15 (GEG-15): UNISDR / UNEP-GRID, non-commercial use.
+  De Bono & Chatenoux (2015).
+- GIRI Building Exposure Model: UNEP/GRID-Geneva.
+  Piller, Benvenuti & De Bono (2023).
+- GEM Global Exposure Model (v2023.1.1, v2026.0.0): GEM Foundation,
+  CC BY-NC-SA 4.0. Yepes-Estrada et al. (2023). Unit construction costs via
+  the UCC-database compilation of the same model.
+- Overture Maps buildings: ODbL 1.0 and source-specific licenses
+  (OpenStreetMap contributors, Microsoft, Google and others).
+- Global Building Atlas LoD1: TU Munich. Zhu et al. (2025),
+  https://doi.org/10.5194/essd-17-6647-2025.
+- Microsoft GlobalML Building Footprints: ODbL 1.0.
+- GHSL (Built-up Volume, DEGURBA): European Commission JRC, CC BY 4.0.
+- World Bank Official Boundaries and WDI indicators: CC BY 4.0.
+
+Aggregated ADM1 statistics derived from ODbL sources are published with
+attribution as produced works; the full building-level databases are not
+redistributed here.

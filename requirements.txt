@@ -1,0 +1,11 @@
+pandas
+geopandas
+pyogrio
+shapely>=2
+pyproj
+rasterio
+matplotlib
+pyyaml
+requests
+duckdb
+contextily
