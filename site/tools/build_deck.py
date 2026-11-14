@@ -35,7 +35,15 @@ SITE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS_DATA = os.path.join(os.path.dirname(SITE), 'docs', 'data')
 TEMPLATE = os.path.expanduser(
     r'~\.claude\skills\wbg-deck-template\assets\WBG_Template.pptx')
-COVER_IMG = os.path.join(SITE, 'deck', 'cover_skyline.png')
+COVER_DIR = os.path.join(SITE, 'deck')
+
+
+def cover_image(iso):
+    """Country-specific cover art (site/deck/cover_<ISO>.png, see
+    make_covers.py), else the neutral default skyline."""
+    own = os.path.join(COVER_DIR, f'cover_{iso.upper()}.png')
+    return own if os.path.exists(own) else os.path.join(
+        COVER_DIR, 'cover_default.png')
 
 NAVY = RGBColor(0x17, 0x40, 0x6D)
 BLUE = RGBColor(0x0F, 0x6F, 0xC6)
@@ -198,9 +206,10 @@ def section_slide(prs, layout, num, title):
     return s
 
 
-def replace_cover_photo(prs):
-    """Swap the Cover layout's 'Photograph' picture for COVER_IMG,
-    center-cropped to the frame's aspect so nothing stretches."""
+def replace_cover_photo(prs, iso):
+    """Swap the Cover layout's 'Photograph' picture for the country's
+    cover art, center-cropped to the frame's aspect so nothing stretches."""
+    COVER_IMG = cover_image(iso)
     if not os.path.exists(COVER_IMG):
         print('cover image not found, keeping template photo:', COVER_IMG)
         return
@@ -303,7 +312,7 @@ def build(iso, out=None):
     # layout "Acknowledgements and disclaimers 7" - wording lives on the
     # layout and is preserved untouched)
     keep_only(prs, {0, 21})
-    replace_cover_photo(prs)
+    replace_cover_photo(prs, iso)
     lay = layout_by_name(prs, 'Content slide 1')
 
     # ---- cover -------------------------------------------------------------

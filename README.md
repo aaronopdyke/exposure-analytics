@@ -105,6 +105,10 @@ cached on the Drive.
    `gem_name_aliases`.
 3. Re-run `protect.py` (the landing page lists every country with built
    data), then `make_figures.py` and `build_deck.py` for the deck.
+4. Optional: give the deck its own cover. `build_deck.py` uses
+   `site/deck/cover_<ISO>.png` when it exists and a neutral skyline
+   otherwise; add a scene to `site/tools/make_covers.py` to draw one in
+   the shared style.
 
 Two situations need more than configuration: a territory WB carries
 separately (Morocco / Western Sahara, curated in `src/gem.py` and
