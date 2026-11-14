@@ -11,15 +11,26 @@ repo must still show the full territory, so:
   on), the ESH ADM0 polygon is APPENDED as one additional unit
   (ADM1CD_c 'ESH000'), labelled per config - shown whole, never subdivided,
   and never merged into a member state.
+
+Countries the WB Admin-1 layer carries as a single unit (config
+`countries.<ISO>.units`, e.g. the Marshall Islands) get atoll units instead:
+see `_atoll_units`.
 """
 
+import functools
+import glob
 import os
 import warnings
+import zipfile
 
 import geopandas as gpd
 import pandas as pd
+import requests
+import shapely
 
-from src.config import CFG, COUNTRY_ISO, ADM0_PATH, ADM1_PATH, DISPLAY_CRS
+from src.config import (CFG, COUNTRIES, COUNTRY_ISO, ADM0_PATH, ADM1_PATH,
+                        DISPLAY_CRS, SOURCE_DIR)
+from src.util import download
 
 _BCFG = dict(CFG.get('boundaries', {}))
 ESH_LABEL = str(_BCFG.get('esh_label', 'Western Sahara'))
@@ -77,6 +88,10 @@ def admin1(iso=None, include_esh=None):
     iso = iso or COUNTRY_ISO
     include_esh = INCLUDE_ESH if include_esh is None else bool(include_esh)
 
+    units = COUNTRIES.get(iso.upper(), {}).get('units')
+    if units and units.get('kind') == 'atolls':
+        return _atoll_units(iso.upper()).copy()
+
     if iso == 'ESH':
         g = esh_admin0()
         if g is None:
@@ -103,6 +118,74 @@ def admin1(iso=None, include_esh=None):
                 ignore_index=True)
             out = gpd.GeoDataFrame(out, geometry='geometry', crs=DISPLAY_CRS)
     return out
+
+
+def _cod_adm1(iso, hdx_id):
+    """OCHA COD-AB Admin-1 polygons (atoll names) for a country, resolved
+    through the HDX CKAN API and cached under Source Data/Boundaries_extra."""
+    dest = os.path.join(SOURCE_DIR, 'Boundaries_extra',
+                        f'cod_ab_{iso.lower()}')
+    pattern = os.path.join(dest, '**', '*adm1*.shp')
+    if not glob.glob(pattern, recursive=True):
+        r = requests.get('https://data.humdata.org/api/3/action/package_show',
+                         params={'id': hdx_id}, timeout=60)
+        r.raise_for_status()
+        url = next(x['url'] for x in r.json()['result']['resources']
+                   if x['format'].upper() == 'SHP')
+        zpath = download(url, os.path.join(dest, f'{iso.lower()}_shp.zip'))
+        with zipfile.ZipFile(zpath) as z:
+            z.extractall(dest)
+    g = gpd.read_file(glob.glob(pattern, recursive=True)[0]).to_crs(DISPLAY_CRS)
+    return g[['ADM1_EN', 'ADM1_PCODE', 'geometry']]
+
+
+@functools.lru_cache(maxsize=None)
+def _atoll_units(iso):
+    """Atoll units for a country the WB Admin-1 layer carries as ONE unit.
+
+    Every part of the WB polygon (the official coastline) is assigned to its
+    nearest COD-AB atoll - which also folds the uninhabited atolls into the
+    municipality that customarily administers them (Erikub -> Wotje, Ujelang
+    -> Enewetak, Bikar/Bokak/Taka -> Utirik, ...). Each unit's geometry is the
+    ENVELOPE of its islets (convex hull + buffer, lagoon included): islets a
+    few hundred metres wide are invisible on a country map and would miss the
+    5 km GAR15/GIRI cells and any building outside the generalised coast.
+    The same envelope is used for display and for every zonal assignment.
+    """
+    cfg = COUNTRIES[iso]['units']
+    wb = _read_where(ADM1_PATH, f"ISO_A3 = '{iso}'").to_crs(DISPLAY_CRS)
+    parts = wb[['geometry']].explode(index_parts=False).reset_index(drop=True)
+    cod = _cod_adm1(iso, cfg['hdx_id'])
+    # nearest atoll in a local equidistant projection (Mollweide shears
+    # distances this far from its central meridian)
+    c = parts.union_all().centroid
+    aeqd = f'+proj=aeqd +lat_0={c.y:.3f} +lon_0={c.x:.3f} +datum=WGS84'
+    near = gpd.sjoin_nearest(parts.to_crs(aeqd),
+                             cod[['ADM1_PCODE', 'geometry']].to_crs(aeqd))
+    parts['ADM1_PCODE'] = near[~near.index.duplicated()]['ADM1_PCODE']
+    buf = float(cfg.get('hull_buffer_deg', 0.04))
+    rename = dict(cfg.get('rename', {}))
+    rows = []
+    link = float(cfg.get('cluster_link_deg', 0.12))
+    for row in cod.sort_values('ADM1_PCODE').itertuples():
+        islets = list(parts.loc[parts['ADM1_PCODE'] == row.ADM1_PCODE,
+                                'geometry']) + list(
+            getattr(row.geometry, 'geoms', [row.geometry]))
+        # one envelope per atoll: islets chain into clusters when closer
+        # than 2 x link, so a unit that also holds outlying atolls becomes a
+        # multi-part unit instead of one hull spanning open ocean
+        blobs = shapely.union_all([g.buffer(link) for g in islets])
+        hull = shapely.union_all([
+            shapely.union_all([g for g in islets if g.intersects(blob)])
+            .convex_hull.buffer(buf)
+            for blob in getattr(blobs, 'geoms', [blobs])])
+        for prev in rows:                       # envelopes never overlap
+            if hull.intersects(prev['geometry']):
+                hull = hull.difference(prev['geometry'])
+        rows.append({'ISO_A3': iso, 'ADM1CD_c': row.ADM1_PCODE,
+                     'admin_name': rename.get(row.ADM1_EN, row.ADM1_EN),
+                     'geometry': hull})
+    return gpd.GeoDataFrame(rows, geometry='geometry', crs=DISPLAY_CRS)
 
 
 def plot_admin1(gdf, title=None, ax=None, esh_hatch=True):

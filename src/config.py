@@ -36,6 +36,22 @@ def load_config():
 
 CFG = load_config()
 COUNTRY_ISO = str(CFG.get('country_iso', 'MAR'))
+COUNTRIES = {str(k).upper(): dict(v or {})
+             for k, v in dict(CFG.get('countries', {})).items()}
+
+
+def country(iso):
+    """Per-country settings from config.yaml (`countries:` block)."""
+    c = COUNTRIES.get(str(iso).upper())
+    if c is None:
+        raise LookupError(
+            f'{iso} is not configured - add it under `countries:` in '
+            'config.yaml (name, gem2023_path, msb_regions).')
+    return c
+
+
+def country_name(iso):
+    return str(country(iso).get('name', iso))
 
 _PROJECT_NAMES = ["Exposure Analytics"]
 

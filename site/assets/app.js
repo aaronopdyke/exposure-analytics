@@ -1,16 +1,19 @@
 /* Exposure Comparison — explorer.
-   One map for seven exposure models on WB ADM1 (single-model choropleth or
-   two-model difference), metric = value (constant latest-year US$) or floor
+   One map for up to seven exposure models on WB ADM1 (single-model choropleth
+   or two-model difference), metric = value (constant latest-year US$) or floor
    area (m2), class = total / urban / rural, plus a composition breakdown
    chart under the map (urban/rural, res/non-res, res/com/ind) scoped to the
-   country or a clicked ADM1 unit. Availability driven by data/<ISO>/meta.json.
+   country or a clicked ADM1 unit. The country comes from ?c=ISO3 (see
+   country.js); availability is driven by data/<ISO>/meta.json.
    Values for Overture/GBA/Microsoft are estimated (floor area x GEM UCC). */
 
 (function () {
   "use strict";
 
-  const ISO = "MAR";
-  const MODEL_ORDER = ["gar15", "giri", "gem2023", "gem2026", "overture", "gba", "msb"];
+  // country = ?c=ISO3 (set by the landing page / the header switcher)
+  const ISO = window.EXPCMP.iso();
+  const ALL_MODELS = ["gar15", "giri", "gem2023", "gem2026", "overture", "gba", "msb"];
+  let MODEL_ORDER = ALL_MODELS;   // narrowed to the models this country has
   const SEG_COLORS = ["#17406D", "#009DD9", "#A5C249", "#0BD0D9"];
 
   const RAMP_SEQ = ["#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#f03b20", "#bd0026"];
@@ -78,27 +81,27 @@
   };
 
   // ---------- data ----------
-  Promise.all([
-    fetch("data/" + ISO + "/meta.json").then((r) => r.json()),
-    fetch("data/" + ISO + "/adm1.geojson").then((r) => r.json()),
-  ]).then(([meta, geo]) => {
+  const getJson = (name) => fetch("data/" + ISO + "/" + name).then((r) => {
+    if (!r.ok) throw new Error("no data published for this country code");
+    return r.json();
+  });
+  Promise.all([getJson("meta.json"), getJson("adm1.geojson")]).then(([meta, geo]) => {
     META = meta;
     FEATURES = geo;
-    document.querySelectorAll("[data-meta-line]").forEach((el) => {
-      el.textContent = "Data built " + (meta.generated || "") +
-        " · values in constant " + usdYear() + " US$";
-    });
-    // brand carries the country name from the data build, not hardcoded
-    const short = (meta.country || "").split(" (")[0];
-    document.querySelectorAll(".brand span").forEach((el) => {
-      if (short) el.textContent = "· " + short;
-    });
+    MODEL_ORDER = ALL_MODELS.filter((mk) => meta.models[mk]);
+    if (!meta.models[S.model]) S.model = MODEL_ORDER[0];
+    if (!meta.models[S.a]) S.a = MODEL_ORDER[0];
+    if (!meta.models[S.b]) S.b = MODEL_ORDER[1];
+    window.EXPCMP.decorate(meta);   // brand, footer line, nav, switcher
     initMap(geo);
     wireControls();
     refresh();
   }).catch((e) => {
-    document.getElementById("model-note").textContent =
-      "Failed to load data (" + e + "). If previewing locally, serve over http.";
+    document.getElementById("model-note").innerHTML =
+      "Could not load data for <b>" + ISO + "</b> (" +
+      String(e.message || e).replace(/[<>&]/g, "") +
+      '). <a href="./">Choose a country</a> — or, if previewing locally, ' +
+      "serve the site over http.";
   });
 
   // ---------- map ----------
@@ -122,9 +125,24 @@
       dragRotate: false, attributionControl: { compact: true },
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-    // refit if the flex layout settles after map construction (initial
-    // zoom was computed against a not-yet-final container size)
-    new ResizeObserver(() => map.resize()).observe(document.getElementById("map"));
+    // keep the whole country in view, clear of the legend (bottom-right on
+    // wide screens), until the user pans or zooms; refit when the flex
+    // layout settles after map construction (the initial zoom is computed
+    // against a not-yet-final container size)
+    const fit = () => {
+      const wide = map.getContainer().clientWidth > 700;
+      map.fitBounds(bbox(geo), { duration: 0, padding: wide
+        ? { top: 30, bottom: 30, left: 30, right: 250 }
+        : { top: 20, bottom: 20, left: 20, right: 20 } });
+    };
+    let userMoved = false;
+    ["dragstart", "zoomstart"].forEach((ev) => map.on(ev, (e) => {
+      if (e.originalEvent) userMoved = true;
+    }));
+    new ResizeObserver(() => {
+      map.resize();
+      if (!userMoved) fit();
+    }).observe(document.getElementById("map"));
 
     map.on("load", () => {
       // diagonal hatch for the Western Sahara (ESH) unit
@@ -151,7 +169,7 @@
         filter: ["==", ["get", "code"], "__none__"],
         paint: { "line-color": "#0F6FC6", "line-width": 3 } });
 
-      map.fitBounds(bbox(geo), { padding: 30, duration: 0 });
+      fit();
 
       let hovered = null;
       map.on("mousemove", "adm1-fill", (ev) => {
@@ -310,9 +328,19 @@
       eshNote();
   }
 
-  const eshNote = () =>
-    '<div class="esh-note">▨ Western Sahara: WB "non-determined legal status" ' +
-    "unit, shown whole (never subdivided).</div>";
+  // country-specific legend footnote: the hatched Western Sahara unit, or
+  // how the display units were formed where WB Admin-1 has none
+  const eshNote = () => {
+    if (FEATURES.features.some((f) => f.properties.esh === true)) {
+      return '<div class="esh-note">▨ Western Sahara: WB "non-determined ' +
+        'legal status" unit, shown whole (never subdivided).</div>';
+    }
+    if (META.units && META.units.kind === "atolls") {
+      return '<div class="esh-note">Atolls are drawn as envelopes around ' +
+        "their islets (lagoon included) so they stay visible.</div>";
+    }
+    return "";
+  };
 
   // ---------- side panel ----------
   function renderTotals() {
@@ -442,8 +470,9 @@
       html += rowHtml(label(mk), col ? p[col] * growFactor(mk) : null, f);
     });
     if (S.metric === "value" && S.cls === "total") {
-      html += rowHtml("· GIRI residential", p[dispCol(META.models.giri.sub.res)], f);
-      html += rowHtml("· GIRI non-residential", p[dispCol(META.models.giri.sub.nres)], f);
+      const gg = growFactor("giri");
+      html += rowHtml("· GIRI residential", p[dispCol(META.models.giri.sub.res)] * gg, f);
+      html += rowHtml("· GIRI non-residential", p[dispCol(META.models.giri.sub.nres)] * gg, f);
     }
     html += "</table>";
     if (p.esh === true || p.esh === "true") {
@@ -529,7 +558,8 @@
       gn.textContent = S.grow
         ? ("Each model grown from its data vintage to " + usdYear() +
            (S.metric === "value"
-             ? " along WB produced-capital accumulation (CWON, ~" +
+             ? " along " + (META.vintages.value_growth.short ||
+                 "WB produced capital (CWON)") + " (~" +
                (100 * META.vintages.value_growth.trailing_cagr).toFixed(1) +
                "%/yr recently)."
              : " at the GHSL built-up-volume rate (~" +

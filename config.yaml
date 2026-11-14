@@ -1,14 +1,67 @@
 # =========================================================================
 # Exposure Analytics - configuration
 #
-# Compares five building-exposure datasets: GAR15, GIRI, GEM, GBA, Overture.
+# Compares seven building-exposure datasets (GAR15, GIRI, GEM v2023/v2026,
+# Overture, GBA, Microsoft) per country.
 # Data stays on Drive under "World Bank/Exposure Analytics" (auto-detected);
 # shared inputs (WB boundaries, GHSL) and the GBA/Overture extractions are
 # reused from the sibling "Global Building Forecast" project.
 # =========================================================================
 
-country_iso: "MAR"
+country_iso: "MAR"         # default for the notebook / tools run without an ISO
 data_root: null            # null -> auto-detect (env DATA_ROOT / Colab / G:)
+
+# -------------------------------------------------------------------------
+# Countries published on the site. Everything country-specific that is not
+# derivable from the data lives here:
+#   name            short display name (site brand, deck cover, file names)
+#   label           long label for meta.json (defaults to name)
+#   gem2023_path    folder of the GEM v2023.1.1 per-country summary
+#   msb_regions     Microsoft GlobalML "Location" names ([] = no coverage)
+#   gem_name_aliases GEM region name -> display-unit name, where they differ
+#                   (only for countries matched by NAME; MAR has a curated
+#                   code crosswalk in src/gem.py)
+#   units           set when the WB Admin-1 layer has no usable subdivisions
+# -------------------------------------------------------------------------
+countries:
+  MAR:
+    name: "Morocco"
+    label: "Morocco (Western Sahara shown as one separate unit)"
+    gem2023_path: "Africa/Morocco"
+    msb_regions: ["Morocco"]
+    notes:
+      gem: "GEM regions matched to WB Admin-1 boundaries; GEM's two southern regions are assigned to the WB Western Sahara unit"
+      site:
+        - "WB Official Boundaries draw Morocco ending at 27.67°N and carry Western Sahara only as a 'non-determined legal status area' with no Admin-1 subdivisions. It is shown as one whole, hatched unit appended to the display - never subdivided and never merged into a member state. WB keeps a small sliver of Laâyoune-Sakia al Hamra north of that line, which is why that unit shows very small totals in every dataset."
+        - "GEM models the 12 official Moroccan regions including the far south; its two southern regions (Laâyoune-Sakia El Hamra, Dakhla-Oued Ed-Dahab) lie almost wholly south of the WB line and are assigned to the Western Sahara unit. GAR15 publishes Western Sahara as a separate file, which supplies that unit."
+        - "Google Open Buildings v3 is excluded: it has essentially no coverage here (77 buildings in the whole country partition)."
+  COL:
+    name: "Colombia"
+    gem2023_path: "South_America/Colombia"
+    msb_regions: ["Colombia"]
+    gem_name_aliases:
+      "Distrito Capital de Bogotá": "Bogotá, D.C."
+      "Bogota": "Bogotá, D.C."
+      "San Andrés y Providencia": "Archipiélago de San Andrés, Providencia y Santa Catalina"
+  MHL:
+    name: "Marshall Islands"
+    gem2023_path: "Oceania/Marshall_Islands"
+    msb_regions: []          # no Microsoft GlobalML tiles over the country
+    gem_name_aliases:
+      "Enewetak & Ujelang": "Enewetak"
+      "Enewatak": "Enewetak"
+      "Utrik": "Utirik"
+      "Bikini & Kili": "Kili"   # Bikini's population (and stock) is on Kili
+    units:
+      # WB Admin-1 carries the whole country as ONE unit ("Administrative
+      # unit not available"). The WB polygon is split into atolls using the
+      # SPC / OCHA COD-AB atoll names (HDX, CC BY-IGO); each unit is drawn
+      # and aggregated as an atoll envelope (convex hull + buffer) because
+      # islets are far too small to see or to catch grid cells at 5 km.
+      kind: "atolls"
+      hdx_id: "cod-ab-mhl"
+      hull_buffer_deg: 0.04
+      rename: {"Eneu": "Bikini"}
 
 boundaries:
   # WB Official Boundaries stop Morocco at 27.67N; Western Sahara exists only
@@ -41,4 +94,8 @@ sources:
     base_url: "https://data.source.coop/tge-labs/globalbuildingatlas-lod1"
     s3_pattern: "s3://us-west-2.opendata.source.coop/tge-labs/globalbuildingatlas-lod1/*.parquet"
   overture:  # Overture Maps buildings (pinned release, DuckDB over S3)
-    url: "s3://overturemaps-us-west-2/release/2026-06-17.0/theme=buildings/type=building/*"
+    # Old releases are deleted from the bucket, so the pin moves forward; the
+    # release each country was extracted from is recorded beside its cache
+    # (Outputs/overture_adm1_<iso>.json). MAR was extracted from 2026-06-17.0.
+    url: "s3://overturemaps-us-west-2/release/2026-10-21.0/theme=buildings/type=building/*"
+    legacy_release: "2026-06-17.0"   # caches written before releases were recorded

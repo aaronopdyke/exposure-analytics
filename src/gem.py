@@ -14,6 +14,10 @@ Monetary columns are USD. "Building replacement" = structural +
 non-structural, EXCLUDING contents (consistent with GAR15/GIRI, which are
 structures-only). GEM covers Western Sahara within its Morocco model in
 both releases; the two southern regions map to the WB unit ESH000.
+
+GEM regions reach the display units through `id1_crosswalk` (v2026) and
+`adm1_totals_2023` (v2023): Morocco uses the curated tables below because
+its boundary sets differ; every other country is matched by region name.
 """
 
 import os
@@ -21,13 +25,18 @@ import unicodedata
 
 import pandas as pd
 
-from src.config import SOURCE_DIR, CFG
+from src.config import SOURCE_DIR, CFG, country
 from src.util import download
 
 RAW = 'https://raw.githubusercontent.com/gem/global_exposure_model'
 URL_2026 = f'{RAW}/v2026.0.0/World/summaries/Exposure_Summary_Adm1_Taxonomy.csv'
-URL_2023 = {'MAR': f'{RAW}/2023.1.1/Africa/Morocco/Exposure_Summary_Adm1.csv'}
 CACHE_DIR = os.path.join(SOURCE_DIR, CFG['sources']['gem']['cache_subdir'])
+
+
+def url_2023(iso):
+    """Per-country v2023.1.1 summary (folder from config `gem2023_path`)."""
+    return (f"{RAW}/2023.1.1/{country(iso)['gem2023_path']}/"
+            'Exposure_Summary_Adm1.csv')
 
 
 def load(iso):
@@ -50,9 +59,8 @@ def load(iso):
 
 def load_2023(iso):
     """GEM v2023.1.1 per-country ADM1 summary (ADM1 x occupancy rows)."""
-    url = URL_2023[iso.upper()]
     cache = os.path.join(CACHE_DIR, f'{iso.lower()}_adm1_2023.1.1.csv')
-    download(url, cache, 1 << 10)
+    download(url_2023(iso), cache, 1 << 10)
     # NB: the published 2023 CSVs carry literal U+FFFD replacement chars
     # where accents were lost upstream; the name crosswalk includes those
     # degraded spellings explicitly
@@ -138,12 +146,38 @@ def _norm(name):
     return ''.join(c for c in s if c.isalpha()).lower()
 
 
+def _unit_lookup(iso):
+    """Normalised GEM region name -> display-unit code, for countries
+    without a curated table: GEM names are matched to the unit names
+    (accents/punctuation ignored), with the config's `gem_name_aliases`
+    covering the names that genuinely differ."""
+    from src.boundaries import admin1
+    units = admin1(iso)
+    lut = {_norm(n): c for n, c in zip(units['admin_name'],
+                                       units['ADM1CD_c'])}
+    for gem_name, unit_name in dict(
+            country(iso).get('gem_name_aliases') or {}).items():
+        lut[_norm(gem_name)] = lut[_norm(unit_name)]
+    return lut
+
+
+def id1_crosswalk(iso, df=None):
+    """{GEM v2026 ID_1: display-unit code}. Curated for MAR (the boundary
+    sets genuinely differ there); matched by region name elsewhere."""
+    iso = iso.upper()
+    if iso in WB_CROSSWALK:
+        return WB_CROSSWALK[iso]
+    df = load(iso) if df is None else df
+    lut = _unit_lookup(iso)
+    pairs = df[['ID_1', 'NAME_1']].drop_duplicates()
+    return {i: lut.get(_norm(n)) for i, n in zip(pairs['ID_1'],
+                                                 pairs['NAME_1'])}
+
+
 def adm1_totals(df, iso, prefix='gem26'):
     """Per-WB-ADM1 metrics for a v2026 frame via the ID_1 crosswalk."""
-    xw = WB_CROSSWALK.get(iso.upper())
-    if xw is None:
-        raise LookupError(f'no GEM->WB ADM1 crosswalk curated for {iso}')
-    unmapped = sorted(set(df['ID_1']) - set(xw))
+    xw = id1_crosswalk(iso, df)
+    unmapped = sorted(i for i in set(df['ID_1']) if xw.get(i) is None)
     if unmapped:
         raise LookupError(f'GEM units missing from {iso} crosswalk: {unmapped}')
     d = df.assign(ADM1CD_c=df['ID_1'].map(xw))
@@ -187,9 +221,7 @@ def adm1_totals(df, iso, prefix='gem26'):
 def adm1_totals_2023(df, iso, prefix='gem23'):
     """Per-WB-ADM1 metrics for a v2023.1.1 frame (name crosswalk, no
     urban/rural split - GEM 2023 publishes none)."""
-    xw = NAME_CROSSWALK.get(iso.upper())
-    if xw is None:
-        raise LookupError(f'no GEM-2023 name crosswalk curated for {iso}')
+    xw = NAME_CROSSWALK.get(iso.upper()) or _unit_lookup(iso)
     d = df.assign(ADM1CD_c=df['NAME_1'].map(lambda n: xw.get(_norm(n))))
     unmapped = sorted(d.loc[d['ADM1CD_c'].isna(), 'NAME_1'].unique())
     if unmapped:

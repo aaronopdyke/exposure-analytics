@@ -21,6 +21,7 @@ Both are physical exposure (counts, footprint m2, floor area m2) - no USD.
 Results are cached as CSV under Outputs/, keyed by ISO3.
 """
 
+import json
 import math
 import os
 import time
@@ -30,7 +31,7 @@ import numpy as np
 import pandas as pd
 import requests
 
-from src.config import CFG, GHSL_DIR, OUTPUTS_DIR, SOURCE_DIR
+from src.config import CFG, GHSL_DIR, OUTPUTS_DIR, SOURCE_DIR, country
 from src.util import ensure_dir
 
 OVERTURE_URL = CFG['sources']['overture']['url']
@@ -45,19 +46,80 @@ _HEIGHT = ("CASE WHEN try_cast(height AS DOUBLE) IS NULL OR "
 _H_MISSING = _HEIGHT.format('1 ELSE 0')
 _H_VALUE = _HEIGHT.format('3.0 ELSE try_cast(height AS DOUBLE)')
 _DIVISOR = "CASE WHEN h < 18 THEN 3.0 WHEN h < 60 THEN 3.25 ELSE 3.5 END"
+# Footprint area in m2. DuckDB's ST_Area_Spheroid reads coordinates as
+# [latitude, longitude]; every source here stores [longitude, latitude], so
+# the geometry is flipped first. Unflipped, the result is silently wrong by
+# cos(lon)/cos(lat) - x1.18 around Casablanca, x0.28 around Bogota, NaN in
+# the Pacific - which is why _connect verifies the convention on every run.
+_AREA = "ST_Area_Spheroid(ST_FlipCoordinates({g}))"
+
+
+def _check_area_convention(con):
+    """Fail loudly if _AREA stops returning true geodesic areas (e.g. a
+    DuckDB release changing the axis order ST_Area_Spheroid expects)."""
+    from pyproj import Geod
+    from shapely.geometry import box
+    for x, y in ((-74.1, 4.6), (171.2, 7.1), (-7.6, 33.5)):
+        sq = box(x, y, x + 0.0002, y + 0.0002)
+        true = abs(Geod(ellps='WGS84').geometry_area_perimeter(sq)[0])
+        got = con.execute(
+            f"SELECT {_AREA.format(g='ST_GeomFromText(?)')}",
+            [sq.wkt]).fetchone()[0]
+        if got is None or not abs(got / true - 1) < 0.01:
+            raise RuntimeError(
+                f'footprint-area check failed at ({x}, {y}): DuckDB returned '
+                f'{got} m2 for a {true:.1f} m2 square - ST_Area_Spheroid axis '
+                'order has changed; fix buildings._AREA before extracting.')
+
+
+def _subdivide(adm1, step=0.25):
+    """Cut every unit into pieces along a `step`-degree grid. The pieces
+    tile the unit exactly, so a centroid falls in the same unit either way,
+    but each containment test now runs against a few dozen vertices instead
+    of a whole department outline - about 70x faster on Colombia, where the
+    undivided join took two hours per source."""
+    import shapely
+    rows = []
+    for code, geom in zip(adm1['ADM1CD_c'], adm1.geometry.values):
+        if not shapely.is_valid(geom):
+            geom = shapely.make_valid(geom)
+        shapely.prepare(geom)
+        minx, miny, maxx, maxy = geom.bounds
+        for i in range(math.floor(minx / step), math.floor(maxx / step) + 1):
+            for j in range(math.floor(miny / step),
+                           math.floor(maxy / step) + 1):
+                cell = shapely.box(i * step, j * step,
+                                   (i + 1) * step, (j + 1) * step)
+                if not geom.intersects(cell):
+                    continue
+                if geom.contains(cell):
+                    rows.append((code, cell))
+                    continue
+                for part in shapely.get_parts(geom.intersection(cell)):
+                    if part.geom_type == 'Polygon' and not part.is_empty:
+                        rows.append((code, part))
+    pieces = pd.DataFrame(rows, columns=['ADM1CD_c', 'geom'])
+    whole = float(shapely.area(adm1.geometry.values).sum())
+    cut = float(shapely.area(pieces['geom'].values).sum())
+    if not abs(cut / whole - 1) < 1e-9:
+        raise RuntimeError(f'unit subdivision lost area ({cut / whole})')
+    return pieces
 
 
 def _connect(adm1):
+    import shapely
     con = duckdb.connect()
     con.execute("INSTALL spatial; LOAD spatial;")
     con.execute("INSTALL httpfs; LOAD httpfs;")
     con.execute("SET s3_region='us-west-2';")
     con.execute("SET enable_progress_bar=false;")
-    df = pd.DataFrame({'ADM1CD_c': adm1['ADM1CD_c'],
-                       'wkt': adm1.geometry.to_wkt()})
+    _check_area_convention(con)
+    pieces = _subdivide(adm1)
+    df = pd.DataFrame({'ADM1CD_c': pieces['ADM1CD_c'],
+                       'wkb': list(shapely.to_wkb(pieces['geom'].values))})
     con.register('adm1_df', df)
     con.execute("CREATE TEMP TABLE adm1 AS "
-                "SELECT ADM1CD_c, ST_GeomFromText(wkt) AS geom FROM adm1_df")
+                "SELECT ADM1CD_c, ST_GeomFromWKB(wkb) AS geom FROM adm1_df")
     return con
 
 
@@ -112,7 +174,7 @@ def extract_overture(iso, adm1, force=False):
     q = f"""
         WITH b AS (
             SELECT ST_Centroid(geometry) AS c,
-                   ST_Area_Spheroid(geometry) AS area,
+                   {_AREA.format(g='geometry')} AS area,
                    try_cast(num_floors AS DOUBLE) AS nf,
                    try_cast(height AS DOUBLE) AS ht
             FROM read_parquet('{OVERTURE_URL}', hive_partitioning=1)
@@ -150,15 +212,42 @@ def extract_overture(iso, adm1, force=False):
                     ['overture_buildings', 'overture_footprint_m2',
                      'overture_floor_known_m2', 'overture_fp_unknown_m2'])
     res.to_csv(out_path, index=False)
+    with open(_overture_sidecar(iso), 'w', encoding='utf-8') as f:
+        json.dump({'release': _release_of(OVERTURE_URL)}, f)
     return res
+
+
+def _release_of(url):
+    return url.split('/release/')[1].split('/')[0]
+
+
+def _overture_sidecar(iso):
+    return os.path.join(OUTPUTS_DIR, f'overture_adm1_{iso.lower()}.json')
+
+
+def overture_release(iso):
+    """Overture release a country's cached extraction came from (releases
+    rotate out of the bucket, so countries can differ). Caches that predate
+    the sidecar are the config's `legacy_release`."""
+    p = _overture_sidecar(iso)
+    if os.path.exists(p):
+        with open(p, encoding='utf-8') as f:
+            return json.load(f)['release']
+    return str(CFG['sources']['overture'].get('legacy_release',
+                                              _release_of(OVERTURE_URL)))
 
 
 MSB_LINKS_URL = ('https://minedbuildings.z5.web.core.windows.net/'
                  'global-buildings/dataset-links.csv')
 MSB_CACHE = os.path.join(SOURCE_DIR, 'Microsoft')
-# Microsoft's RegionName per ISO3 (dataset-links.csv has no Western Sahara
-# region; coverage of ESH territory rides on the Morocco partition, if any)
-MSB_REGIONS = {'MAR': ['Morocco']}
+
+
+def msb_regions(iso):
+    """Microsoft's "Location" name(s) per ISO3 (config.yaml). An empty list
+    means the release has no tiles over the country (e.g. the Marshall
+    Islands) and the model is dropped for it. dataset-links.csv has no
+    Western Sahara region; ESH coverage rides on the Morocco partition."""
+    return list(country(iso).get('msb_regions') or [])
 
 
 def _fetch_msb(iso):
@@ -168,7 +257,7 @@ def _fetch_msb(iso):
     links_path = os.path.join(ensure_dir(MSB_CACHE), 'dataset-links.csv')
     download(MSB_LINKS_URL, links_path, 1 << 10)
     links = pd.read_csv(links_path)
-    links = links[links['Location'].isin(MSB_REGIONS[iso.upper()])]
+    links = links[links['Location'].isin(msb_regions(iso))]
     if not len(links):
         raise LookupError(f'no Microsoft GlobalML region for {iso}')
     paths = []
@@ -205,7 +294,7 @@ def extract_msb(iso, adm1, force=False):
                 SELECT a.ADM1CD_c,
                        ST_Transform(ST_Centroid(b.g), 'EPSG:4326',
                                     'ESRI:54009', always_xy := true) AS p,
-                       ST_Area_Spheroid(b.g) AS area,
+                       {_AREA.format(g='b.g')} AS area,
                        b.ht
                 FROM b JOIN adm1 AS a
                   ON ST_Contains(a.geom, ST_Centroid(b.g))
@@ -302,7 +391,7 @@ def extract_gba(iso, adm1, force=False):
                        b.area, b.h, b.missing
                 FROM (
                     SELECT ST_Centroid(geometry)      AS c,
-                           ST_Area_Spheroid(geometry) AS area,
+                           {_AREA.format(g='geometry')} AS area,
                            {_H_MISSING}               AS missing,
                            {_H_VALUE}                 AS h
                     FROM read_parquet('{path.replace(os.sep, '/')}')

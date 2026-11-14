@@ -43,8 +43,25 @@ VINTAGE_YEARS = {'gar15': 2011, 'giri': 2020, 'gem2023': 2023,
 #   GAR15 along it and comparing to GIRI isolates method differences.
 # - FLOOR AREA: GHSL Built-up Volume growth (physical proxy; capital growth
 #   includes deepening/quality, which floor space does not).
-PC_URL = ('https://api.worldbank.org/v2/country/{iso}/indicator/'
-          'NW.PCA.TO?format=json&per_page=100')
+#   Where the Wealth Accounts publish no produced capital for a country
+#   (small island states, e.g. the Marshall Islands) the value path falls
+#   back to WDI real GDP - a stable capital-output ratio makes GDP the
+#   closest published proxy - and meta.json records which basis was used.
+WDI_URL_T = ('https://api.worldbank.org/v2/country/{iso}/indicator/'
+             '{ind}?format=json&per_page=100')
+VALUE_BASES = {
+    'produced_capital': {
+        'indicator': 'NW.PCA.TO',
+        'source': ('WB Wealth Accounts produced capital '
+                   '(NW.PCA.TO, real chained 2019 US$)'),
+        'short': 'WB produced capital (CWON)'},
+    'real_gdp': {
+        'indicator': 'NY.GDP.MKTP.KD',
+        'source': ('WDI real GDP (NY.GDP.MKTP.KD, constant 2015 US$) - the '
+                   'WB Wealth Accounts publish no produced capital for this '
+                   'country, so GDP stands in for the capital path'),
+        'short': 'real GDP (WDI; no produced-capital series published)'},
+}
 FALLBACK_CAPITAL_CAGR = 0.057   # MAR trailing-10y, verified 2026-07
 FALLBACK_BUILTV_RATE = 0.015    # MAR GHS-BUILT-V 2010-2020 CAGR
 
@@ -69,25 +86,55 @@ def _save_growth_cache(iso, data):
         json.dump(data, f)
 
 
-def produced_capital_series(iso):
-    """{year: produced capital} (NW.PCA.TO, real chained 2019 US$)."""
-    cache = _growth_cache(iso)
-    if 'produced_capital' in cache:
-        return {int(k): v for k, v in cache['produced_capital'].items()}
-    r = requests.get(PC_URL.format(iso=iso), timeout=60)
+def _wdi_fetch(iso, indicator):
+    """{year: value} for one WDI indicator; {} when the country simply has
+    no observations (HTTP/parse errors raise - they must not be mistaken
+    for 'not published')."""
+    r = requests.get(WDI_URL_T.format(iso=iso, ind=indicator), timeout=60)
     r.raise_for_status()
-    rows = r.json()[1] or []
-    s = {int(x['date']): float(x['value']) for x in rows
-         if x['value'] is not None}
-    if not s:
-        raise LookupError(f'no NW.PCA.TO data for {iso}')
-    cache['produced_capital'] = s
-    _save_growth_cache(iso, cache)
-    return s
+    body = r.json()
+    rows = (body[1] if len(body) > 1 else None) or []
+    return {int(x['date']): float(x['value']) for x in rows
+            if x['value'] is not None}
+
+
+def value_series(iso):
+    """(basis, {year: level}) of the series values are grown along:
+    produced capital where the Wealth Accounts publish it, else real GDP.
+    Cached per country (Source Data/WDI/growth_<iso>.json)."""
+    cache = _growth_cache(iso)
+    for basis in VALUE_BASES:
+        if basis in cache:
+            return basis, {int(k): v for k, v in cache[basis].items()}
+    for basis, spec in VALUE_BASES.items():
+        s = _wdi_fetch(iso, spec['indicator'])
+        if s:
+            cache[basis] = s
+            _save_growth_cache(iso, cache)
+            return basis, s
+    raise LookupError(f'no produced-capital or real-GDP series for {iso}')
+
+
+def value_basis(iso):
+    """VALUE_BASES entry (+ 'basis' key) describing the country's value
+    growth series; the fallback constant when nothing could be fetched."""
+    try:
+        basis = value_series(iso)[0]
+    except Exception:
+        return {'basis': 'fallback', 'indicator': None,
+                'source': f'assumed {FALLBACK_CAPITAL_CAGR:.1%}/yr (no series)',
+                'short': 'an assumed constant rate'}
+    return dict(VALUE_BASES[basis], basis=basis)
+
+
+def produced_capital_series(iso):
+    """{year: level} of the value-growth series (produced capital, or the
+    real-GDP stand-in - see value_series)."""
+    return value_series(iso)[1]
 
 
 def capital_cagr(iso, window=10):
-    """Trailing-{window}-year CAGR of real produced capital."""
+    """Trailing-{window}-year CAGR of the value-growth series."""
     try:
         s = produced_capital_series(iso)
     except Exception:
@@ -125,7 +172,11 @@ def capital_growth_factor(iso, from_year, to_year):
 
 
 def builtv_growth_rate(iso, epochs=(2010, 2020)):
-    """CAGR of GHSL Built-up Volume over the country bbox (cached)."""
+    """CAGR of GHSL Built-up Volume inside the country's units (cached).
+
+    Masked to the unit polygons, not the bounding box: a bbox drags in the
+    neighbours' cities (Caracas, Quito and Panama City all sit inside
+    Colombia's)."""
     cache = _growth_cache(iso)
     key = f'builtv_cagr_{epochs[0]}_{epochs[1]}'
     if key in cache:
@@ -133,21 +184,21 @@ def builtv_growth_rate(iso, epochs=(2010, 2020)):
     try:
         import numpy as np
         import rasterio
-        from rasterio.windows import from_bounds
-        from rasterio.warp import transform_bounds
+        from rasterio.mask import mask
         from src.config import GHSL_DIR
         from src.boundaries import admin1
-        b4326 = tuple(admin1(iso).total_bounds)
+        units = admin1(iso)
         tot = {}
         for y in epochs:
             p = os.path.join(
                 GHSL_DIR, 'Volume_Total',
                 f'GHS_BUILT_V_E{y}_GLOBE_R2023A_54009_1000_V1_0.tif')
             with rasterio.open(p) as src:
-                b = transform_bounds('EPSG:4326', src.crs, *b4326)
-                a = src.read(1, window=from_bounds(*b, src.transform))
+                shape = units.to_crs(src.crs).union_all()
+                a, _ = mask(src, [shape], crop=True, indexes=1)
+                a = a.astype('float64')
                 if src.nodata is not None:
-                    a = np.where(a == src.nodata, 0, a)
+                    a[a == src.nodata] = 0
                 tot[y] = float(a.sum())
         rate = (tot[epochs[1]] / tot[epochs[0]]) ** (
             1 / (epochs[1] - epochs[0])) - 1

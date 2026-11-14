@@ -1,9 +1,10 @@
 """Publish the site HTML behind a landing page (open by default).
 
-Default (no flags): docs/index.html becomes the branded landing page with a
-single "Enter the explorer" button (the explorer HTML is embedded and swapped
-in on click - no password, no crypto); every other page is copied to docs/
-as-is.
+Default (no flags): docs/index.html becomes the branded landing page with the
+country selection - one link per country that has built data
+(docs/data/countries.json), each a plain navigation to explorer.html?c=ISO3
+(no password, no crypto); every other page is copied to docs/ with its nav
+links repointed at explorer.html.
 
 Optional legacy modes:
   py site/tools/protect.py --password X   # AES-256-GCM password gate on all
@@ -18,6 +19,8 @@ direct URL. Do not publish sensitive data.
 import argparse
 import base64
 import hashlib
+import html
+import json
 import os
 import shutil
 import sys
@@ -204,9 +207,22 @@ document.getElementById("f").addEventListener("submit", async ev => {
 """
 
 
-_OPEN_FORM = """  <form id="f">
-    <button type="submit">Enter the explorer</button>
-  </form>"""
+_OPEN_FORM = """  <p class="pick" id="pick-label">Choose a country</p>
+  <nav class="countries" aria-labelledby="pick-label">
+__COUNTRIES__
+  </nav>"""
+
+_OPEN_CSS = """  .pick { font-size:0.72rem; letter-spacing:0.14em; text-transform:uppercase;
+          color:#8fd6f2; margin:0 0 0.55rem; }
+  .countries { display:grid; gap:0.55rem; }
+  .countries a { display:flex; justify-content:space-between;
+          align-items:center; padding:0.6rem 0.85rem; border-radius:8px;
+          text-decoration:none; font-weight:600; color:#06263f;
+          background:linear-gradient(90deg,#0BD0D9,#009DD9); }
+  .countries a:hover, .countries a:focus-visible { filter:brightness(1.08); }
+  .countries a:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+  .countries a span { font-weight:400; opacity:0.75; }
+</style>"""
 
 _GATED_FORM = """  <form id="f">
     <input type="password" id="pw" placeholder="Password" autofocus
@@ -215,29 +231,34 @@ _GATED_FORM = """  <form id="f">
     <div class="err" id="err"></div>
   </form>"""
 
-_OPEN_JS = """function enter() {
-  try { sessionStorage.setItem("expcmp_entered", "1"); } catch (e) {}
-  location.href = "explorer.html";
-}
-document.getElementById("f").addEventListener("submit", ev => {
-  ev.preventDefault();
-  enter();
-});
-/* returning visitors skip the landing entirely */
-try {
-  if (sessionStorage.getItem("expcmp_entered")) location.replace("explorer.html");
-} catch (e) {}
-</script>
+_OPEN_JS = """</script>
 </body>
 </html>
 """
 
 
+def built_countries():
+    """[{iso, name}] for every country with built data (the index
+    build_data.py maintains in docs/data/countries.json)."""
+    path = os.path.join(DOCS, 'data', 'countries.json')
+    if not os.path.exists(path):
+        sys.exit('docs/data/countries.json not found - run '
+                 'site/tools/build_data.py for at least one country first.')
+    with open(path, encoding='utf-8') as f:
+        return json.load(f)
+
+
 def landing_page(dst):
-    """Landing page whose Enter button is a plain navigation to
-    explorer.html - no content embedding, no document.write."""
+    """Landing page = the country selection. Each country is a plain link
+    to explorer.html?c=ISO3 - no content embedding, no document.write, and
+    no auto-skip (the picker has to stay reachable with the Back button)."""
+    links = '\n'.join(
+        f'    <a href="explorer.html?c={html.escape(c["iso"])}">'
+        f'{html.escape(c["name"])}<span aria-hidden="true">&rarr;</span></a>'
+        for c in built_countries())
     head = TEMPLATE.split('const SALT =')[0]
-    head = head.replace(_GATED_FORM, _OPEN_FORM)
+    head = head.replace(_GATED_FORM, _OPEN_FORM.replace('__COUNTRIES__', links))
+    head = head.replace('</style>', _OPEN_CSS, 1)
     with open(dst, 'w', encoding='utf-8') as f:
         f.write(head + _OPEN_JS)
 
@@ -294,14 +315,15 @@ def main():
     # explorer.html and every nav link is repointed at it
     for f in pages:
         with open(os.path.join(PAGES, f), encoding='utf-8') as fh:
-            html = fh.read()
-        html = html.replace('href="index.html"', 'href="explorer.html"')
+            page = fh.read()
+        page = page.replace('href="index.html"', 'href="explorer.html"')
         out = 'explorer.html' if f == 'index.html' else f
         with open(os.path.join(DOCS, out), 'w', encoding='utf-8') as fh:
-            fh.write(html)
+            fh.write(page)
     landing_page(os.path.join(DOCS, 'index.html'))
-    print(f'Wrote docs/index.html landing (Enter -> explorer.html) + '
-          f'{len(pages)} page(s).')
+    print('Wrote docs/index.html landing (country picker: '
+          f'{", ".join(c["iso"] for c in built_countries())} -> '
+          f'explorer.html?c=ISO) + {len(pages)} page(s).')
 
 
 if __name__ == '__main__':

@@ -46,6 +46,16 @@
   button:hover { filter:brightness(1.08); }
   .err { color:#ffb3a7; font-size:0.8rem; min-height:1.2em; margin-top:0.6rem; }
   .foot { margin-top:1.1rem; font-size:0.7rem; color:#7fa3c4; }
+  .pick { font-size:0.72rem; letter-spacing:0.14em; text-transform:uppercase;
+          color:#8fd6f2; margin:0 0 0.55rem; }
+  .countries { display:grid; gap:0.55rem; }
+  .countries a { display:flex; justify-content:space-between;
+          align-items:center; padding:0.6rem 0.85rem; border-radius:8px;
+          text-decoration:none; font-weight:600; color:#06263f;
+          background:linear-gradient(90deg,#0BD0D9,#009DD9); }
+  .countries a:hover, .countries a:focus-visible { filter:brightness(1.08); }
+  .countries a:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+  .countries a span { font-weight:400; opacity:0.75; }
 </style>
 </head>
 <body>
@@ -55,9 +65,12 @@
   <h1>Exposure Comparison</h1>
   <p class="sub">Comparing building-exposure models for
      disaster risk management</p>
-  <form id="f">
-    <button type="submit">Enter the explorer</button>
-  </form>
+  <p class="pick" id="pick-label">Choose a country</p>
+  <nav class="countries" aria-labelledby="pick-label">
+    <a href="explorer.html?c=COL">Colombia<span aria-hidden="true">&rarr;</span></a>
+    <a href="explorer.html?c=MHL">Marshall Islands<span aria-hidden="true">&rarr;</span></a>
+    <a href="explorer.html?c=MAR">Morocco<span aria-hidden="true">&rarr;</span></a>
+  </nav>
   <div class="foot">&copy; Aaron Opdyke</div>
 </div>
 <script>
@@ -113,18 +126,6 @@
   }
   svg.innerHTML = html;
 })();
-function enter() {
-  try { sessionStorage.setItem("expcmp_entered", "1"); } catch (e) {}
-  location.href = "explorer.html";
-}
-document.getElementById("f").addEventListener("submit", ev => {
-  ev.preventDefault();
-  enter();
-});
-/* returning visitors skip the landing entirely */
-try {
-  if (sessionStorage.getItem("expcmp_entered")) location.replace("explorer.html");
-} catch (e) {}
 </script>
 </body>
 </html>

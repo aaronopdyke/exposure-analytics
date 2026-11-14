@@ -38,6 +38,10 @@ repository's outputs also requires complying with them:
 - Microsoft GlobalML Building Footprints: ODbL 1.0.
 - GHSL (Built-up Volume, DEGURBA): European Commission JRC, CC BY 4.0.
 - World Bank Official Boundaries and WDI indicators: CC BY 4.0.
+- Marshall Islands atoll names: Subnational Administrative Boundaries
+  (COD-AB), Secretariat of the Pacific Community (SPC) Statistics for
+  Development Division via OCHA / HDX, CC BY-IGO. Used only to name the
+  parts of the World Bank polygon; its geometry is not redistributed.
 
 Aggregated ADM1 statistics derived from ODbL sources are published with
 attribution as produced works; the full building-level databases are not

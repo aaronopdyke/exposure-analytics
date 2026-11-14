@@ -1,17 +1,19 @@
 """Build the site's static data from the exposure-analytics loaders.
 
 Reads the cached extractions (Drive Outputs/) plus the fast loaders,
-assembles one wide per-ADM1 table, and writes:
+assembles one wide per-unit table, and writes, per country:
 
-  docs/data/MAR/adm1.geojson   (simplified WB ADM1 + all metrics)
-  docs/data/MAR/meta.json      (model/column registry + country totals)
+  docs/data/<ISO>/adm1.geojson   (simplified display units + all metrics)
+  docs/data/<ISO>/meta.json      (model/column registry + country totals)
+  docs/data/countries.json       (index of every country built so far)
 
-and copies site/assets/* into docs/assets/. Run AFTER the Overture, GBA
-and Microsoft extractions have been cached (they are not triggered from
-here so a site rebuild can never kick off an hour-long scan by accident).
+and copies site/assets/* into docs/assets/. The first build of a country
+runs its Overture / GBA / Microsoft extractions (minutes to an hour or
+more); afterwards they are read from the Drive cache.
 
 Seven models: GAR15, GIRI, GEM v2023.1.1, GEM v2026.0.0, Overture, GBA,
-Microsoft GlobalML.
+Microsoft GlobalML (dropped where Microsoft publishes no tiles).
+Countries are configured in config.yaml (`countries:`).
 
 Floor areas for Overture/Microsoft: reported num_floors/height where
 present (floor_known) + a GBA-CALIBRATED storey multiplier for the rest -
@@ -26,7 +28,7 @@ Value handling: nominal USD columns keep each model's native price year
 floor area x GEM-derived ADM1 UCC (src/ucc.py; excludes contents,
 consistent with GAR15/GIRI which are structures-only).
 
-Usage:  py site/tools/build_data.py  [ISO3=MAR]
+Usage:  py site/tools/build_data.py  [ISO3 ...]     (default: config country)
 """
 
 import datetime
@@ -43,6 +45,7 @@ DOCS = os.path.join(REPO, 'docs')   # GitHub Pages root
 sys.path.insert(0, REPO)
 
 from src.boundaries import admin1                             # noqa: E402
+from src.config import COUNTRY_ISO, country                   # noqa: E402
 from src import buildings, deflate, gar15, gem, giri, ucc, util  # noqa: E402
 
 GAR_COLS = ['gar15_usd', 'gar15_urban_usd', 'gar15_rural_usd']
@@ -59,14 +62,54 @@ DOCS_LINKS = {
 }
 
 
-def _models(iso):
+def _coverage(wide, names, has_msb):
+    """Data-driven coverage facts for the footprint sources: the share of
+    footprint carrying a usable height/floors attribute, and (Microsoft)
+    the units where the release has little or no data relative to GBA."""
+    cov = {}
+    for p in ['overture'] + (['msb'] if has_msb else []):
+        fp = wide[f'{p}_footprint_m2'].sum()
+        cov[p] = {'attr_share': round(
+            float(1 - wide[f'{p}_fp_unknown_m2'].sum() / fp) if fp else 0.0, 4)}
+    cov['gba'] = {'missing_height_share': round(float(
+        wide['gba_missing_height'].sum() / max(wide['gba_buildings'].sum(), 1)),
+        4)}
+    if has_msb:
+        # Judged on footprint AREA, not building count: Microsoft draws
+        # adjoining buildings as one polygon, so dense cities carry a
+        # fraction of GBA's count while covering nearly the same area
+        # (Bogota: 15% of the count, 87% of the footprint).
+        ratio = wide['msb_footprint_m2'] / wide['gba_footprint_m2'].where(
+            wide['gba_footprint_m2'] > 0)
+        sparse = wide.loc[(ratio < 0.25) & (wide['gba_buildings'] > 1000),
+                          'ADM1CD_c']
+        cov['msb']['sparse_units'] = [names[c] for c in sparse]
+        cov['msb']['vs_gba_buildings'] = round(float(
+            wide['msb_buildings'].sum() / max(wide['gba_buildings'].sum(), 1)),
+            3)
+        cov['msb']['vs_gba_footprint'] = round(float(
+            wide['msb_footprint_m2'].sum()
+            / max(wide['gba_footprint_m2'].sum(), 1)), 3)
+    return cov
+
+
+def _attr_phrase(share):
+    if share < 0.005:
+        return 'essentially never populated'
+    if share < 0.25:
+        return f'populated for only {share:.0%} of footprint area'
+    return f'populated for {share:.0%} of footprint area'
+
+
+def _models(iso, cov, has_msb, gem_split, overture_release):
+    cc = country(iso)
     est = ('Replacement value ESTIMATED as floor area x GEM-derived unit '
-           'construction cost per ADM1 (2024 US$, excl. contents).')
+           'construction cost per unit (2024 US$, excl. contents).')
     storey = ('floor area = reported heights where present + GBA-calibrated '
-              'storey multipliers (GBA floor/footprint ratio per ADM1 and '
+              'storey multipliers (GBA floor/footprint ratio per unit and '
               'urban/rural class) for the rest')
-    xwalk = ("GEM regions matched to WB Admin-1 boundaries; GEM's two "
-             'southern regions are assigned to the WB Western Sahara unit')
+    xwalk = str(dict(cc.get('notes') or {}).get(
+        'gem', 'GEM regions matched to the display units by region name'))
     m = {
         'gar15': {
             'label': 'GAR15 (UNISDR)', 'vintage': '2015 (2005 US$)',
@@ -122,9 +165,12 @@ def _models(iso):
                      f're-based to 2024-25). {xwalk}. Urban/rural published '
                      'for residential only.')},
         'overture': {
-            'label': 'Overture Maps', 'vintage': '2026-06 release',
+            'label': 'Overture Maps',
+            'vintage': f'{overture_release[:7]} release',
             'estimated_value': True,
-            'note': ('Mapped footprints (OSM, Microsoft, Google); '
+            'note': ('Mapped footprints (OSM, Microsoft, Google); height / '
+                     'floors attributes are '
+                     f"{_attr_phrase(cov['overture']['attr_share'])}; "
                      f'{storey}. {est}')},
         'gba': {
             'label': 'Global Building Atlas LoD1', 'vintage': '~2024',
@@ -132,16 +178,30 @@ def _models(iso):
             'note': ('Footprints + modelled heights (TUM LoD1); floor area '
                      'via the 3-tier storey divisor; missing heights = 1 '
                      f'storey. Calibrates the other footprint sources. {est}')},
-        'msb': {
+    }
+    if has_msb:
+        sparse = cov['msb']['sparse_units']
+        partial = ('Coverage is PARTIAL - little or no data in '
+                   f"{', '.join(sparse[:4])}"
+                   f"{' and others' if len(sparse) > 4 else ''}, so totals "
+                   'undercount. ') if sparse else ''
+        m['msb'] = {
             'label': 'Microsoft Buildings', 'vintage': '2026-02 release',
             'estimated_value': True,
-            'note': ('Native Microsoft GlobalML footprints. Coverage is '
-                     f'PARTIAL in {iso} - several interior regions (e.g. '
-                     'Souss-Massa, Beni Mellal-Khenifra) have no tiles, so '
-                     'totals undercount. The height field is unmodelled '
-                     f'(-1) here, so {storey}. {est}')},
-    }
-    for p in FOOTPRINT_MODELS:
+            'note': (f'Native Microsoft GlobalML footprints. {partial}'
+                     'The height field is '
+                     f"{_attr_phrase(cov['msb']['attr_share'])}; {storey}. "
+                     f'{est}')}
+    if not gem_split:
+        # this country's v2026 rows carry no URBAN/RURAL settlement tags
+        g26 = m['gem2026']
+        for k in ('value', 'floor'):
+            g26[k] = {'total': g26[k]['total']}
+        g26.pop('split_note')
+        g26['note'] = g26['note'].replace(
+            ' Urban/rural published for residential only.',
+            ' No urban/rural split published for this country.')
+    for p in [p for p in FOOTPRINT_MODELS if p in m]:
         m[p]['value'] = {c: f'{p}_value_usd{s}' for c, s in
                          [('total', ''), ('urban', '_urban'),
                           ('rural', '_rural')]}
@@ -155,9 +215,9 @@ def _models(iso):
                       [f'{p}_value_usd_rural', 'rural']],
             'floor': [[f'{p}_floor_area_m2_urban', 'urban'],
                       [f'{p}_floor_area_m2_rural', 'rural']]}
-        m[p]['docs'] = DOCS_LINKS[p]
     for k, url in DOCS_LINKS.items():
-        m[k]['docs'] = url
+        if k in m:
+            m[k]['docs'] = url
     return m
 
 
@@ -196,7 +256,7 @@ _SCENARIOS = {
 }
 
 
-def _sensitivity(wide, rate, adj):
+def _sensitivity(wide, rate, adj, has_msb=True):
     """Country totals for the footprint models under alternative storey
     rules. GBA is recomputed per building (floor/ceil) or per height tier
     (divisor shifts); Overture/Microsoft reuse the GBA multiplier
@@ -220,7 +280,7 @@ def _sensitivity(wide, rate, adj):
         fp = wide['gba_footprint_m2']
         mult = (g / fp.where(fp > 0)).fillna(g.sum() / fp.sum())
         floors = {'gba': g}
-        for p in ('overture', 'msb'):
+        for p in ['overture'] + (['msb'] if has_msb else []):
             floors[p] = (wide[f'{p}_floor_known_m2']
                          + wide[f'{p}_fp_unknown_m2'] * mult)
         out[key] = {'label': label, 'models': {
@@ -230,13 +290,57 @@ def _sensitivity(wide, rate, adj):
     return out
 
 
+def _unit_info(iso, adm1):
+    """How this country's display units relate to WB Admin-1."""
+    units = country(iso).get('units')
+    if units and units.get('kind') == 'atolls':
+        return {'kind': 'atolls', 'count': len(adm1), 'noun': 'atoll',
+                'label': 'atolls: WB coastline split by SPC/OCHA atoll names',
+                'note': ('WB Official Boundaries carry this country as a '
+                         'single Admin-1 unit, so the WB polygon is split '
+                         'into atolls using the SPC / OCHA COD-AB atoll '
+                         'names. Each atoll is drawn - and every dataset '
+                         'aggregated - as an envelope around its islets '
+                         '(lagoon included); uninhabited atolls belong to '
+                         'the nearest municipality.')}
+    return {'kind': 'adm1', 'count': len(adm1), 'noun': 'region',
+            'label': 'WB Admin-1 units', 'note': None}
+
+
+def write_country_index():
+    """docs/data/countries.json - the countries with built data, for the
+    landing page picker and the explorer's country switcher."""
+    root = os.path.join(DOCS, 'data')
+    rows = []
+    for d in sorted(os.listdir(root)):
+        p = os.path.join(root, d, 'meta.json')
+        if os.path.exists(p):
+            with open(p, encoding='utf-8') as f:
+                m = json.load(f)
+            rows.append({'iso': m['iso'],
+                         'name': (m.get('name')
+                                  or m['country'].split(' (')[0]),
+                         'generated': m['generated']})
+    rows.sort(key=lambda r: r['name'])
+    with open(os.path.join(root, 'countries.json'), 'w',
+              encoding='utf-8') as f:
+        json.dump(rows, f, indent=1)
+    return rows
+
+
 def build(iso='MAR'):
+    iso = iso.upper()
+    cc = country(iso)
     adm1 = admin1(iso)
     include_esh = (adm1['ADM1CD_c'] == 'ESH000').any()
+    has_msb = bool(buildings.msb_regions(iso))
+    footprint = [p for p in FOOTPRINT_MODELS if p != 'msb' or has_msb]
 
     print('GAR15 ...')
     g15 = gar15.load(iso, include_esh=include_esh)
     wide = util.points_to_adm1(g15, adm1, GAR_COLS, nearest_max_deg=0.1)
+    print(f"  assigned {wide['gar15_usd'].sum() / g15['gar15_usd'].sum():.1%}"
+          ' of the country file')
 
     print('GIRI ...')
     cells = giri.load_cells(tuple(adm1.total_bounds))
@@ -245,26 +349,33 @@ def build(iso='MAR'):
         .drop(columns='geometry')[['ADM1CD_c'] + GIRI_COLS], on='ADM1CD_c')
 
     print('GEM v2023.1.1 + v2026.0.0 ...')
+    g26 = gem.load(iso)
     wide = wide.merge(gem.adm1_totals_2023(gem.load_2023(iso), iso),
                       on='ADM1CD_c', how='left')
-    wide = wide.merge(gem.adm1_totals(gem.load(iso), iso),
-                      on='ADM1CD_c', how='left')
+    wide = wide.merge(gem.adm1_totals(g26, iso), on='ADM1CD_c', how='left')
+    gem_split = bool(g26['SETTLEMENT'].isin(['URBAN', 'RURAL']).any())
 
-    print('Overture + GBA + Microsoft (cached extractions) ...')
-    for fn in (buildings.extract_overture, buildings.extract_gba,
-               buildings.extract_msb):
+    print('Overture + GBA' + (' + Microsoft' if has_msb else '')
+          + ' (cached extractions) ...')
+    fns = [buildings.extract_overture, buildings.extract_gba]
+    if has_msb:
+        fns.append(buildings.extract_msb)
+    for fn in fns:
         wide = wide.merge(fn(iso, adm1), on='ADM1CD_c', how='left')
 
     num0 = [c for c in wide.columns
             if c != 'geometry' and wide[c].dtype.kind in 'if']
     wide[num0] = wide[num0].fillna(0.0)
+    names = dict(zip(wide['ADM1CD_c'],
+                     wide['admin_name'].str.split(' (', regex=False).str[0]))
+    cov = _coverage(wide, names, has_msb)
 
     print('GBA-calibrated storeys + UCC values + deflator ...')
-    for p in ('overture', 'msb'):
+    for p in [p for p in ('overture', 'msb') if p in footprint]:
         wide = _estimate_floor(wide, p)
     u = ucc.adm1_ucc(iso, list(wide['ADM1CD_c']))
     rate = wide['ADM1CD_c'].map(u)
-    for p in FOOTPRINT_MODELS:
+    for p in footprint:
         for s in ('', '_urban', '_rural'):
             wide[f'{p}_value_usd{s}'] = wide[f'{p}_floor_area_m2{s}'] * rate
 
@@ -291,9 +402,29 @@ def build(iso='MAR'):
 
     # ---- meta.json ----
     totals = {c: float(wide[c].sum()) for c in num_cols}
+    basis = deflate.value_basis(iso)
+    units = _unit_info(iso, adm1)
+    notes = [str(n) for n in (dict(cc.get('notes') or {}).get('site') or [])]
+    if units['note']:
+        notes.append(units['note'])
+    if not has_msb:
+        notes.append('Microsoft GlobalML Building Footprints publish no '
+                     'tiles over this country, so six models are compared '
+                     'here instead of seven.')
+    if basis['basis'] != 'produced_capital':
+        notes.append('The WB Wealth Accounts publish no produced-capital '
+                     'series for this country; the vintage adjustment grows '
+                     f"values along {basis['short'].split(' (')[0]} instead.")
+    if not gem_split:
+        notes.append('GEM v2026 publishes no urban/rural split for this '
+                     'country.')
     meta = {
         'iso': iso,
-        'country': 'Morocco (Western Sahara shown as one separate unit)',
+        'name': cc['name'],
+        'country': cc.get('label', cc['name']),
+        'units': units,
+        'notes': notes,
+        'coverage': cov,
         'generated': datetime.date.today().isoformat(),
         'deflator': {'target_year': deflate.target_year(),
                      'source': 'WDI NY.GDP.DEFL.ZS (USA)',
@@ -302,8 +433,9 @@ def build(iso='MAR'):
         'vintages': {
             'years': deflate.VINTAGE_YEARS,
             'value_growth': {
-                'source': ('WB Wealth Accounts produced capital '
-                           '(NW.PCA.TO, real chained 2019 US$)'),
+                'source': basis['source'],
+                'basis': basis['basis'],
+                'short': basis['short'],
                 'trailing_cagr': round(deflate.capital_cagr(iso), 4),
                 'factors': {m: round(deflate.capital_growth_factor(
                     iso, y, deflate.target_year()), 3)
@@ -318,8 +450,9 @@ def build(iso='MAR'):
                            'ADM1 TOTAL occupancy'),
                 'per_adm1_usd_m2': {k: round(v, 1) for k, v in u.items()}},
         'sensitivity': _sensitivity(
-            wide, rate, deflate.factor(deflate.VALUE_YEARS['ucc'])),
-        'models': _models(iso),
+            wide, rate, deflate.factor(deflate.VALUE_YEARS['ucc']), has_msb),
+        'models': _models(iso, cov, has_msb, gem_split,
+                          buildings.overture_release(iso)),
         'totals': totals,
     }
     with open(os.path.join(out_dir, 'meta.json'), 'w', encoding='utf-8') as f:
@@ -332,19 +465,23 @@ def build(iso='MAR'):
     for fn in os.listdir(a_src):
         shutil.copy2(os.path.join(a_src, fn), os.path.join(a_dst, fn))
 
+    index = write_country_index()
+
     yr = deflate.target_year()
     print(f'wrote {out_dir} (geojson '
           f'{os.path.getsize(os.path.join(out_dir, "adm1.geojson")) // 1024} '
-          f'kB) + assets')
+          f'kB) + assets; countries.json = {[r["iso"] for r in index]}')
     for label, col in [('GAR15', 'gar15_usd'), ('GIRI', 'giri_total_usd'),
                        ('GEM23', 'gem23_bldg_repl_usd'),
                        ('GEM26', 'gem26_bldg_repl_usd'),
                        ('Ovtr*', 'overture_value_usd'),
                        ('GBA*', 'gba_value_usd'),
                        ('MSB*', 'msb_value_usd')]:
-        print(f'{label:6s} {totals[col] / 1e9:7.1f} B$ nominal | '
-              f'{totals[col + "_adj"] / 1e9:7.1f} B$ ({yr})')
+        if col in totals:
+            print(f'{label:6s} {totals[col] / 1e9:8.2f} B$ nominal | '
+                  f'{totals[col + "_adj"] / 1e9:8.2f} B$ ({yr})')
 
 
 if __name__ == '__main__':
-    build(sys.argv[1] if len(sys.argv) > 1 else 'MAR')
+    for _iso in (sys.argv[1:] or [COUNTRY_ISO]):
+        build(_iso)

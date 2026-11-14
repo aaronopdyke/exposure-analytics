@@ -4,17 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Exposure Comparison</title>
-<meta name="description" content="Compare building-exposure models (GAR15, GIRI, GEM v2023/v2026, Overture, GBA, Microsoft) for a target country on World Bank Admin-1 units.">
+<meta name="description" content="Compare building-exposure models (GAR15, GIRI, GEM v2023/v2026, Overture, GBA, Microsoft) country by country on World Bank Admin-1 units.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%A2%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.0/dist/maplibre-gl.min.css">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <header class="site-header">
-  <div class="brand">Exposure Comparison <span></span></div>
+  <div class="brand"><a href="./" title="Choose a country">Exposure Comparison</a>
+    <select id="country-sel" class="country-sel hidden" aria-label="Country"></select></div>
   <nav>
-    <a href="explorer.html" class="active">Explorer</a>
-    <a href="about.html">About</a>
+    <a href="explorer.html" class="active" data-c>Explorer</a>
+    <a href="about.html" data-c>About</a>
   </nav>
 </header>
 
@@ -105,10 +106,11 @@
   © Aaron Opdyke · GAR15 (UNISDR/UNEP-GRID) · GIRI BEM (UNEP/GRID-Geneva) ·
   <a href="https://github.com/gem/global_exposure_model">GEM</a> ·
   Overture Maps (ODbL) · GBA LoD1 (TUM) · Microsoft GlobalML · WB Official Boundaries ·
-  <span data-meta-line></span> · <a href="about.html">Method &amp; caveats</a>
+  <span data-meta-line></span> · <a href="about.html" data-c>Method &amp; caveats</a>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.0/dist/maplibre-gl.min.js"></script>
+<script src="assets/country.js"></script>
 <script src="assets/app.js"></script>
 </body>
 </html>

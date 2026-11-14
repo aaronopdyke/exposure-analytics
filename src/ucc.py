@@ -9,16 +9,17 @@ value on the footprint datasets (Overture, GBA, VIDA):
 
     estimated value = floor area x ADM1 TOTAL UCC
 
-GEM ID_1 codes map to WB ADM1 via gem.WB_CROSSWALK; ESH000 gets the
-area-weighted UCC of GEM's two southern regions; units with no GEM row
-(e.g. the WB MAR007 sliver) fall back to the national TOTAL UCC.
+GEM ID_1 codes map to the display units via gem.id1_crosswalk; ESH000 gets
+the area-weighted UCC of GEM's two southern regions; units with no GEM row
+(e.g. the WB MAR007 sliver, uninhabited atolls) fall back to the national
+TOTAL UCC.
 """
 
 import os
 
 import pandas as pd
 
-from src.gem import WB_CROSSWALK
+from src.gem import id1_crosswalk
 
 LOCAL_CSV = r'c:\Users\aaron\repos\UCC-database\data\ucc_adm1.csv'
 RAW_URL = ('https://raw.githubusercontent.com/aaronopdyke/ucc-database/'
@@ -37,10 +38,7 @@ def _load(iso):
 def adm1_ucc(iso, adm1_codes):
     """UCC (USD/m2, 2021 US$) per WB ADM1CD_c as a Series over adm1_codes."""
     df = _load(iso)
-    xw = WB_CROSSWALK.get(iso.upper())
-    if xw is None:
-        raise LookupError(f'no GEM->WB crosswalk for {iso}')
-    df = df.assign(ADM1CD_c=df['ID_1'].map(xw))
+    df = df.assign(ADM1CD_c=df['ID_1'].map(id1_crosswalk(iso)))
     grp = df.groupby('ADM1CD_c')
     # area-weighted UCC where several GEM units share a WB unit (ESH000)
     ucc = grp.apply(
