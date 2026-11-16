@@ -11,6 +11,9 @@ Writes site/deck/cover_<ISO>.png (3440x1936). build_deck.py uses
 cover_<ISO>.png when it exists and cover_default.png otherwise. Morocco's
 cover_MAR.png is hand-made artwork and is not regenerated here.
 
+Covers carry no explicit religious symbols (crosses, crescents and the
+like): places of worship may appear as buildings, without the emblem.
+
 The Cover layout shows roughly the x = 160..1420 band of the 2000-unit
 design width (the rest is cropped), so landmarks belong inside it.
 """
@@ -94,11 +97,6 @@ class Canvas:
             for c in range(cols):
                 x0, y0 = x + c * (w + gx), y + r * (h + gy)
                 self.rect(x0, y0, x0 + w, y0 + h, color)
-
-    def cross(self, cx, top, size=26, color=NAVY):
-        self.rect(cx - 2.5, top, cx + 2.5, top + size, color)
-        self.rect(cx - size * 0.32, top + size * 0.28,
-                  cx + size * 0.32, top + size * 0.28 + 5, color)
 
     def dashed_box(self, x0, y0, x1, y1, on=13, off=8, lw=3):
         def run(a, b, fixed, horizontal):
@@ -227,7 +225,6 @@ def colombia():
         c.rect(tx0 - 7, 536, tx0 + 85, 550)
         c.dome(tx0 + 39, 538, 30, 40)                    # cupola
         c.rect(tx0 + 33, 478, tx0 + 45, 502)
-        c.cross(tx0 + 39, 448, 32)
         c.arch(tx0 + 39, 652, 30, 70)                    # belfry opening
         c.arch(tx0 + 39, 800, 24, 56)
     c.rect(505, 770, 657, H)                             # nave
@@ -235,7 +232,6 @@ def colombia():
     c.rect(548, 668, 614, 730)                           # drum
     c.dome(581, 670, 40, 52)
     c.rect(576, 598, 586, 622)
-    c.cross(581, 572, 28)
     c.ellipse(581, 832, 24, 24, CYAN)                    # rose window
     c.arch(581, H, 62, 150)
     c.dashed_box(414, 432, 528, 700)
@@ -355,7 +351,6 @@ def marshall_islands():
     cabin(1058, 1196, 892, 964, roof=50)
     c.rect(1104, 800, 1150, 900)
     c.poly([(1098, 802), (1127, 718), (1156, 802)])
-    c.cross(1127, 684, 34)
     c.arch(1127, 872, 20, 40)
     c.arch(1127, 964, 32, 58)
     c.windows(1070, 912, 1, 1, 18, 34)

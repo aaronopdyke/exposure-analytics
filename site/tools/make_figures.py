@@ -108,23 +108,29 @@ def make(iso, out=None):
     # ---- per-model maps: ONE shared colour scale across all models -------
     vmax = float(g[[m[2] for m in models]].max().max())
     _, _, mfmt = money_scale(vmax)
+    # Every map is the same canvas with the map, colour bar and title in
+    # fixed places (no tight-bbox crop, which re-centres the picture on
+    # whatever the title's width happens to be) - so flipping between the
+    # model slides the country stays put and only the colours change.
     for key, _, col, _, _ in models:
-        fig, ax = plt.subplots(figsize=(7.2, 6.4))
+        fig = plt.figure(figsize=(7.2, 6.0))
+        ax = fig.add_axes([0.01, 0.01, 0.80, 0.89])
+        cax = fig.add_axes([0.85, 0.24, 0.028, 0.50])
         g.plot(column=col, ax=ax, cmap=WBG_SEQ,
                edgecolor='#8fa3b3' if atolls else 'white',
-               linewidth=0.5 if atolls else 0.8, legend=True, vmin=0,
-               vmax=vmax,
-               legend_kwds={'shrink': 0.55,
-                            'label': f'{usdlab} (shared scale)',
+               linewidth=0.5 if atolls else 0.8, legend=True, cax=cax,
+               vmin=0, vmax=vmax,
+               legend_kwds={'label': f'{usdlab} (shared scale)',
                             'format': lambda v, _: mfmt(v)})
         esh = g[g['esh'] == True]  # noqa: E712
         if len(esh):
             esh.plot(ax=ax, facecolor='none', edgecolor='#8a8873',
                      hatch='///', linewidth=0.9)
         ax.set_axis_off()
-        ax.set_title(MAP_TITLES[key], fontsize=14, fontweight='bold',
-                     color=NAVY, pad=8)
-        save(fig, MAP_FILES[key])
+        fig.text(0.41, 0.945, MAP_TITLES[key], ha='center', va='center',
+                 fontsize=14, fontweight='bold', color=NAVY)
+        fig.savefig(os.path.join(out, MAP_FILES[key]), dpi=200)
+        plt.close(fig)
 
     # ---- comparison: totals bars + their grown twin -----------------------
     # the twin keeps IDENTICAL axes so the two deck slides overlay exactly
