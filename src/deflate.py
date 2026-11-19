@@ -1,11 +1,19 @@
 """
-Exposure Analytics - price-year alignment via the WDI US GDP deflator.
+Exposure Analytics - price-year alignment via the WDI US GDP deflator,
+and the scope adjustment of the two top-down models.
 
 Each exposure model reports USD of a different base year (verified against
-the source documentation this project cached):
+the source documentation this project cached, except GAR15):
 
-- GAR15: 2005 US$  (WB CWON 2011 produced capital, "current (2005) capital
-  stock of machinery and structures" per the GEG-15 metadata PDF)
+- GAR15: ~2013 US$. The GEG-15 documentation cites WB CWON 2011 "current
+  (2005) capital stock" but never states the year of its own values, and
+  they are not the 2005 figures: GAR15's national stock is 1.9-3.0x the
+  CWON 2005 produced capital for the eight countries checked (USA, DEU,
+  JPN, MEX, IND, COL, MAR, VEN), and its median ratio to GDP is 5.4 against
+  2005 GDP but ~3 against 2011-2013 GDP. GAR 2015 itself normalises the
+  stock by 2013 GDP and 2013 gross fixed capital formation, so 2013 is
+  used (2011 would raise GAR15 by 3.5%). 2005 was assumed here until
+  2026-11.
 - GIRI BEM: 2018 US$ (WB CWON 2021 produced capital, constant 2018 US$,
   per the BEM technical report)
 - GEM v2023.1.1: 2021 US$ (Yepes-Estrada et al. 2023)
@@ -28,8 +36,30 @@ WDI_URL = ('https://api.worldbank.org/v2/country/USA/indicator/'
            'NY.GDP.DEFL.ZS?format=json&per_page=100')
 CACHE = os.path.join(SOURCE_DIR or '', 'WDI', 'us_gdp_deflator.json')
 
-VALUE_YEARS = {'gar15': 2005, 'giri': 2018, 'gem2023': 2021,
+VALUE_YEARS = {'gar15': 2013, 'giri': 2018, 'gem2023': 2021,
                'gem2026': 2024, 'ucc': 2024}
+
+# Scope adjustment. GAR15 and GIRI are not building stock in the sense
+# of the other models: both start from WB *produced capital* - machinery,
+# equipment and structures - which the World Bank scales up by 24% for
+# urban land. GAR15 assigns all of it to buildings (infrastructure is not
+# separated: De Bono & Chatenoux 2015, sections 1 and 2.1.6); GIRI
+# subtracts a separately modelled infrastructure stock (BEM report,
+# section 2.1.7). The land mark-up is the one component that can be
+# taken out, so the constant-US$ (`_adj`) values of both are divided by
+# 1.24. Machinery and equipment (and GAR15's infrastructure) remain, so
+# both still overstate buildings. For GIRI the division is approximate:
+# the mark-up applied to produced capital before infrastructure was
+# subtracted.
+URBAN_LAND_MARKUP = 0.24
+SCOPE_FACTORS = {'gar15': 1 / (1 + URBAN_LAND_MARKUP),
+                 'giri': 1 / (1 + URBAN_LAND_MARKUP)}
+
+
+def scope_factor(model):
+    """Multiplier that removes the urban-land mark-up (1 for models
+    that carry none)."""
+    return SCOPE_FACTORS.get(model, 1.0)
 
 # approximate DATA vintage (what year the physical stock reflects) - used by
 # the vintage reconciliation, distinct from the price base above

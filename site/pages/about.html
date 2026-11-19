@@ -35,17 +35,19 @@ differences that are just data age from differences that are fundamental.</p>
 <h2>Datasets</h2>
 <table>
 <tr><th>Model</th><th>Vintage (price base)</th><th>Native form</th><th>What "value" means</th><th>Access &amp; technical docs</th></tr>
-<tr><td><b>GAR15</b> (UNISDR GEG-15)</td><td>2015 release, ~2011 inputs (<b>2005 US$</b>)</td>
+<tr><td><b>GAR15</b> (UNISDR GEG-15)</td><td>2015 release, ~2011 inputs (<b>~2013 US$</b>)</td>
   <td>~5&nbsp;km point grid (1&nbsp;km at the coast)</td>
-  <td>Capital stock of buildings (structures; <em>no contents</em>), downscaled
-      from World Bank produced capital; native urban/rural split</td>
+  <td>World Bank <em>produced capital</em> assigned to buildings: machinery,
+      equipment and all structures, infrastructure included. Shown here less
+      the World Bank's 24% urban-land mark-up; native urban/rural split</td>
   <td><a href="https://data.humdata.org/dataset?q=gar15-global-exposure-dataset">HDX shapefiles (per country)</a> ·
       <a href="https://www.preventionweb.net/english/hyogo/gar/2015/en/bgdocs/risk-section/De%20Bono,%20Andrea,%20Bruno%20Chatenoux.%202015.%20A%20Global%20Exposure%20Model%20for%20GAR%202015,%20%20UNEP-GRID.pdf">De Bono &amp; Chatenoux (2015)</a></td></tr>
 <tr><td><b>GIRI</b> BEM</td><td>~2023 release, ~2020 inputs (<b>2018 US$</b>)</td>
   <td>5×5&nbsp;km global rasters</td>
-  <td>Capital stock of buildings (structures; <em>no contents</em>) derived from
-      World Bank produced capital — the BEM report calls this "building stock
-      value"; residential and non-residential layers</td>
+  <td>World Bank <em>produced capital</em> less GIRI's separate
+      infrastructure stock — the BEM report calls this "building stock", but
+      machinery and equipment are still in it. Shown here less the World
+      Bank's 24% urban-land mark-up; residential and non-residential layers</td>
   <td><a href="https://giri.unepgrid.ch">giri.unepgrid.ch</a> ·
       <a href="https://giri.unepgrid.ch/sites/default/files/2023-09/GIRI_BEM_report_UNIGE.pdf">BEM technical report (2023)</a></td></tr>
 <tr><td><b>GEM v2023.1.1</b></td><td>June 2023 release (<b>2021 US$</b>)</td>
@@ -97,8 +99,13 @@ USA; target year and per-model factors are recorded per country in
 <code>data/&lt;ISO&gt;/meta.json</code>):</p>
 <table>
 <tr><th>Model</th><th>Native price base</th><th>Evidence</th></tr>
-<tr><td>GAR15</td><td>2005 US$</td><td>GEG-15 metadata: WB (2011) "current
-  (2005) capital stock of machinery and structures"</td></tr>
+<tr><td>GAR15</td><td>~2013 US$</td><td>Not stated in the GEG-15
+  documentation, which cites the World Bank's 2005 produced capital. The
+  values are not those figures: GAR15's national stock is 1.9–3.0× the
+  World Bank's 2005 estimate in the eight countries checked, and about
+  three times 2011–2013 GDP. GAR 2015 itself compares the stock with 2013
+  GDP and investment, so 2013 is used (2005 was assumed here until
+  November 2026).</td></tr>
 <tr><td>GIRI BEM</td><td>2018 US$</td><td>BEM technical report: WB produced
   capital "constant 2018 US dollars"</td></tr>
 <tr><td>GEM v2023.1.1</td><td>2021 US$</td>
@@ -178,8 +185,7 @@ ADM1 unit construction cost (UCC)</em></p>
 compilation of the GEM exposure model — <code>BLDG_REPL_COST_USD /
 TOTAL_AREA_SQM</code> per GEM admin-1, all occupancies combined
 (<span data-v="name">this country</span>:
-<span data-v="ucc_range">…</span>/m² across units). It excludes contents,
-consistent with GAR15/GIRI. GEM admin-1 UCCs are mapped to the display units
+<span data-v="ucc_range">…</span>/m² across units). It excludes contents. GEM admin-1 UCCs are mapped to the display units
 via the region matching below; a unit that pools several GEM regions uses
 their area-weighted UCC, and a unit with no GEM region the national one.</p>
 
@@ -294,11 +300,16 @@ never does.</p>
 
 <h2>Comparability caveats</h2>
 <ul class="small">
-<li><b>Value definitions differ</b>: GAR15/GIRI are the capital stock of
-buildings downscaled from national produced capital; GEM is engineering
+<li><b>Value definitions differ</b>: GAR15 and GIRI start from national
+<em>produced capital</em>, which covers machinery and equipment as well as
+structures and carries a 24% World Bank mark-up for urban land. GAR15
+assigns all of it to buildings, infrastructure included; GIRI subtracts a
+separate infrastructure stock. Both are shown here divided by 1.24 to
+remove the land mark-up — the one part that can be taken out — and so
+still overstate buildings. GEM is engineering
 replacement cost; Overture/GBA/Microsoft are estimated replacement values
-(floor area × UCC). None equals market or insured value. All exclude
-contents — so figures here are <em>lower</em> than GEM's own published
+(floor area × UCC). None equals market or insured value. GEM's contents
+are excluded — so its figures here are <em>lower</em> than GEM's own published
 country totals, which include a contents column
 (<span data-v="name">this country</span>, GEM v2026:
 <span data-v="gem26_nominal">…</span> structures shown here vs

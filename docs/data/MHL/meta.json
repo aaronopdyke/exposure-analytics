@@ -30,8 +30,8 @@
   "adj_suffix": "_adj",
   "models": {
    "gar15": {
-    "year": 2005,
-    "factor": 1.581
+    "year": 2013,
+    "factor": 1.3606
    },
    "giri": {
     "year": 2018,
@@ -50,6 +50,14 @@
     "factor": 1.028
    }
   }
+ },
+ "scope": {
+  "urban_land_markup": 0.24,
+  "factors": {
+   "gar15": 0.8065,
+   "giri": 0.8065
+  },
+  "note": "GAR15 and GIRI are World Bank produced capital, which carries a 24% mark-up for urban land; their comparison values are divided by 1.24 to remove it. Machinery and equipment (and, in GAR15, infrastructure) cannot be separated and remain."
  },
  "vintages": {
   "years": {
@@ -190,7 +198,7 @@
  "models": {
   "gar15": {
    "label": "GAR15 (UNISDR)",
-   "vintage": "2015 (2005 US$)",
+   "vintage": "2015 (~2013 US$)",
    "value": {
     "total": "gar15_usd",
     "urban": "gar15_urban_usd",
@@ -209,7 +217,7 @@
      ]
     ]
    },
-   "note": "Capital stock of buildings (structures, no contents), top-down from WB produced capital. Native urban/rural split.",
+   "note": "World Bank produced capital assigned to buildings: machinery, equipment and all structures, infrastructure included. Shown less the World Bank's 24% urban-land mark-up, so it still overstates buildings. Native urban/rural split.",
    "docs": "https://www.preventionweb.net/english/hyogo/gar/2015/en/bgdocs/risk-section/De%20Bono,%20Andrea,%20Bruno%20Chatenoux.%202015.%20A%20Global%20Exposure%20Model%20for%20GAR%202015,%20%20UNEP-GRID.pdf"
   },
   "giri": {
@@ -235,7 +243,7 @@
      ]
     ]
    },
-   "note": "Capital stock of buildings (structures, no contents), 5 km cells assigned by largest overlap. Residential / non-residential layers; no urban/rural split.",
+   "note": "World Bank produced capital less GIRI's infrastructure stock: machinery and equipment are still included. Shown less the World Bank's 24% urban-land mark-up. 5 km cells assigned by largest overlap. Residential / non-residential layers; no urban/rural split.",
    "docs": "https://giri.unepgrid.ch/sites/default/files/2023-09/GIRI_BEM_report_UNIGE.pdf"
   },
   "gem2023": {
@@ -490,12 +498,12 @@
   "gba_value_usd": 3134845447.9213943,
   "gba_value_usd_urban": 1880254658.5123928,
   "gba_value_usd_rural": 1254590789.4090014,
-  "gar15_usd_adj": 1211577407.837152,
-  "gar15_urban_usd_adj": 357502313.04992205,
-  "gar15_rural_usd_adj": 854075094.78723,
-  "giri_total_usd_adj": 504536906.58717275,
-  "giri_res_usd_adj": 252041727.27291548,
-  "giri_nres_usd_adj": 252495179.21700886,
+  "gar15_usd_adj": 840841426.7694731,
+  "gar15_urban_usd_adj": 248108583.92853695,
+  "gar15_rural_usd_adj": 592732842.8409361,
+  "giri_total_usd_adj": 406884602.0864297,
+  "giri_res_usd_adj": 203259457.47815764,
+  "giri_nres_usd_adj": 203625144.52984583,
   "gem23_bldg_repl_usd_adj": 1477369033.672515,
   "gem23_res_usd_adj": 1258075829.5161772,
   "gem23_com_usd_adj": 182752997.49805054,

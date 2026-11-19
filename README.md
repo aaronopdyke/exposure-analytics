@@ -35,27 +35,35 @@ of any page.
 
 ## How to read the numbers
 
-- The models measure **three different things**: GAR15/GIRI report the
-  *capital stock of buildings* (top-down from national produced capital),
-  GEM reports *engineering replacement cost*, and the footprint datasets
-  (Overture, Global Building Atlas, Microsoft) carry *estimated replacement
-  values* (floor area × GEM unit construction costs). None is market or
-  insured value; all are structures-only (contents excluded — which is also
-  why GEM's own published totals are higher than the figures here).
+- The models measure **three different things**: GAR15/GIRI distribute
+  national *produced capital* (top-down), GEM reports *engineering
+  replacement cost*, and the footprint datasets (Overture, Global Building
+  Atlas, Microsoft) carry *estimated replacement values* (floor area × GEM
+  unit construction costs). None is market or insured value. GEM's contents
+  are excluded, which is why its own published totals are higher than the
+  figures here.
+- **GAR15 and GIRI are not buildings-only.** World Bank produced capital
+  covers machinery and equipment as well as structures, and carries a 24%
+  mark-up for urban land. GAR15 assigns all of it to buildings,
+  infrastructure included; GIRI subtracts a separate infrastructure stock.
+  Both are shown here divided by 1.24 to remove the land mark-up — the one
+  part that can be taken out — so they still overstate buildings. GAR15's
+  values are treated as ~2013 US$ (its documentation does not state the
+  year; see `src/deflate.py` for the evidence).
 - **Disagreement is information, not error.** Footprint datasets count what
   is *mapped* (they miss what mappers miss); top-down models distribute
   national aggregates (they include unmapped stock but inherit their source's
   assumptions). A gap between the two tells you something real about a
   country's data landscape.
 - **Magnitudes hold up under the assumptions.** For Morocco the native-value
-  models span ~2.7×; growing everything to a common year *widens* the spread,
+  models span ~1.9×; growing everything to a common year *widens* the spread,
   and even extreme storey-height rules move footprint totals only −8%/+29%.
   The conclusions are about method, not tuning. Each country's own figures
   are on its About page.
-- **The ranking is not universal.** In Morocco the top-down capital-stock
-  models sit above the footprint estimates; in the Marshall Islands the
-  mapped footprints imply more than twice the floor area the engineering
-  model assumes. That is the reason to look country by country.
+- **The ranking is not universal.** In Colombia all seven models land
+  within 1.6× of each other; in the Marshall Islands the mapped footprints
+  imply more than twice the floor area the engineering model assumes. That
+  is the reason to look country by country.
 
 Everything model-specific — vintages, price bases, boundary handling, the
 UCC valuation, caveats per dataset — is documented on the site's About page.

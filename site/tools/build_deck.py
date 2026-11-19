@@ -316,6 +316,11 @@ def build(iso, out=None):
               'GEM v2023': ('gem23_bldg_repl_usd_adj', 'gem2023'),
               'GEM v2026': ('gem26_bldg_repl_usd_adj', 'gem2026')}
     native = {n: v for n, v in native.items() if v[1] in M}
+    # GAR15 and GIRI are WB produced capital, shown less its urban-land
+    # mark-up (src/deflate.py); the wording below says so wherever they
+    # are described
+    land = 1 + meta['scope']['urban_land_markup']
+    gar_year = meta['deflator']['models']['gar15']['year']
     has_gar = 'gar15' in M
     # GAR15 by unit (map, regions, urban/rural) vs a national total only
     gar_grid = has_gar and not M['gar15'].get('national_only')
@@ -358,25 +363,27 @@ def build(iso, out=None):
                     'models are compared instead of seven', True)
     if has_gar and not gar_grid:
         gar_card = ('GAR15 — national total only', BLUE,
-                    "UNISDR; national capital stock from GAR15's "
+                    "UNISDR; national produced capital from GAR15's "
                     f'country results - no ~5 km grid file for {CTY}, '
                     'so no map or regional split', False)
     elif has_gar:
         gar_card = ('GAR15 — Global Assessment Report 2015', BLUE,
-                    'UN Int. Strategy for Disaster Reduction (UNISDR); ~5 km '
-                    'point grid, ~2011 inputs; native urban/rural split',
-                    False)
+                    'UNISDR; ~5 km point grid, ~2011 inputs; all produced '
+                    'capital, infrastructure included, assigned to '
+                    'buildings', False)
     else:
         gar_card = ('GAR15 — not available', MUTED,
                     f"UNISDR's per-country release has no file for {CTY}; "
                     f'{NUM_WORD[n_models]} models are compared instead of '
                     'seven', True)
     cols = [
-        ('CAPITAL STOCK OF BUILDINGS', 'top-down, from WB produced capital', [
+        ('PRODUCED CAPITAL, AS BUILDINGS',
+         'top-down from WB produced capital; incl. machinery & equipment', [
             gar_card,
             ('GIRI — Global Infrastructure Resilience Index', NAVY,
              'Building Exposure Model, UNEP/GRID-Geneva (~2023); 5 km '
-             'rasters, ~2020 inputs; res / non-res layers', False),
+             'rasters, ~2020 inputs; produced capital less infrastructure',
+             False),
         ]),
         ('BUILDING REPLACEMENT COST', 'bottom-up engineering, excl. contents', [
             ('GEM v2023.1.1 — Global Exposure Model', BRIGHT,
@@ -403,10 +410,10 @@ def build(iso, out=None):
         for j, (name, color, desc, muted) in enumerate(cards):
             _card(s, x, 2.32 + j * 1.44, w, name, color, desc, muted=muted)
     _box(s, x0, 6.85, 3 * w + 2 * gap, 0.52, TINT)
-    aligned = (f"aggregated to {units['count']} atolls (WB coastline, "
-               f'split by atoll) · {USD} · structures only' if atolls
-               else f'aligned to WB Official Boundaries Admin-1 · {USD} · '
-               'structures only (contents excluded everywhere)')
+    aligned = ((f"aggregated to {units['count']} atolls (WB coastline by "
+                f'atoll) · {USD} · ' if atolls else
+                f'aligned to WB Official Boundaries Admin-1 · {USD} · ')
+               + 'GEM contents and GAR15/GIRI urban land removed')
     text_block(s, x0 + 0.2, 6.95, 3 * w + 2 * gap - 0.4, [
         (f'All {NUM_WORD[n_models]} {aligned}', 12, True, NAVY, 0)])
 
@@ -422,14 +429,23 @@ def build(iso, out=None):
                  'engineering models assume')
     elif fpv[hi_p] < min(nat.values()):
         where = 'BELOW every native-value model'
-    else:
+    elif (fpv[lo_p] >= min(nat.values())
+          and fpv[hi_p] <= max(nat.values())):
         where = 'inside the range spanned by the native-value models'
+    else:
+        where = ('overlapping the native-value models, which run from '
+                 f'{B(min(nat.values()))} to {B(max(nat.values()))}')
     text_block(s, 0.75, 5.95, 11.8, [
         ('After price-year alignment: '
          + ' · '.join(f'{n} {B(v)}' for n, v in nat.items())
-         + '. All figures are structures-only (GEM contents dropped). The '
-         'remaining spread is method, not price levels - see the vintage '
-         'slide.', 12.5, False, GREY, 8),
+         + '. GEM contents are dropped. '
+         + ('GAR15 and GIRI are' if has_gar else 'GIRI is')
+         + ' produced capital less urban land and still '
+         + ('include' if has_gar else 'includes')
+         + ' machinery and equipment'
+         + (' (GAR15 also infrastructure)' if has_gar else '')
+         + ', so the spread is method, not price levels.',
+         12.5, False, GREY, 8),
         (f'With GBA-calibrated storeys the {NUM_WORD[len(fps)]} footprint '
          f'estimates sit between {B(fpv[lo_p])} ({fp_label[lo_p]}) and '
          f'{B(fpv[hi_p])} ({fp_label[hi_p]}) - {where}.',
@@ -549,15 +565,19 @@ def build(iso, out=None):
     if gar_grid:
         model_slide('GAR15 — UNISDR Global Exposure Dataset (2015)',
             'map_gar15.png', B(T['gar15_usd_adj']),
-            f'capital stock of buildings, {USD}', [
-            f"{B(T['gar15_usd'])} in its native 2005 US$ (WB produced capital, "
-            'structures - no contents)',
+            f'produced capital assigned to buildings, less urban land, {USD}',
+            [
+            f"{B(T['gar15_usd'])} as published (about {gar_year} US$): WB "
+            'produced capital - machinery, equipment and all structures, '
+            'infrastructure included, plus 24% for urban land',
+            f'shown here ÷{land:.2f} to remove urban land; the rest cannot '
+            'be separated, so it still overstates buildings',
             f"urban {B(T['gar15_urban_usd_adj'])} · rural "
             f"{B(T['gar15_rural_usd_adj'])} "
             f"({pct(T['gar15_urban_usd'], T['gar15_rural_usd'])} urban, native "
             'split)',
-            'top-down: national capital stock distributed on a ~5 km grid '
-            '(1 km at the coast) using population and GDP proxies',
+            'top-down: the national total is spread over a ~5 km grid (1 km '
+            'at the coast) using population and GDP proxies',
             'source: HDX per-country shapefiles'
             + (f"; {notes['gar15']}" if notes.get('gar15') else ''),
         ])
@@ -580,28 +600,32 @@ def build(iso, out=None):
              'urban/rural split.', 13, False, GREY, 0)])
         text_block(sl, 7.5, 1.6, 5.5, [
             (B(T['gar15_usd_adj']), 30, True, NAVY, 2),
-            (f'capital stock of buildings, {USD}', 13, False, BLUE, 16),
-            (f"–  {B(T['gar15_usd'])} in its native 2005 US$ (WB "
-             'produced capital, structures - no contents)', 12.5, False,
-             GREY, 8),
+            ('produced capital assigned to buildings, less urban land, '
+             f'{USD}', 13, False, BLUE, 16),
+            (f"–  {B(T['gar15_usd'])} as published (about {gar_year} "
+             'US$): WB produced capital - machinery, equipment and all '
+             'structures, infrastructure included, plus 24% for urban '
+             'land', 12.5, False, GREY, 8),
+            (f'–  shown here ÷{land:.2f} to remove urban land; the rest '
+             'cannot be separated, so it still overstates buildings',
+             12.5, False, GREY, 8),
             ("–  national figure from GAR15's country results; that "
              'field matches the gridded totals of Colombia, Morocco '
              'and the Marshall Islands to within 1.5%', 12.5, False,
              GREY, 8),
-            ('–  top-down: national capital stock that GAR15 spreads '
-             'over a ~5 km grid using population and GDP proxies',
-             12.5, False, GREY, 8),
             (f'–  {top_txt}', 12.5, False, GREY, 8),
         ])
     model_slide('GIRI — Building Exposure Model (~2023)',
         'map_giri.png', B(T['giri_total_usd_adj']),
-        f'capital stock of buildings, {USD}', [
-        f"{B(T['giri_total_usd'])} in its native 2018 US$ (WB produced "
-        'capital, structures - no contents)',
+        f'produced capital less infrastructure and urban land, {USD}', [
+        f"{B(T['giri_total_usd'])} as published (2018 US$): WB produced "
+        "capital, urban land included, less GIRI's infrastructure stock",
+        f'shown here ÷{land:.2f} to remove urban land; machinery and '
+        'equipment remain, so it still overstates buildings',
         f"residential {B(T['giri_res_usd_adj'])} · non-residential "
         f"{B(T['giri_nres_usd_adj'])}",
         'top-down 5×5 km global rasters by UNEP/GRID-Geneva; includes '
-        'social infrastructure (health, education)',
+        'health and education buildings',
         'no urban/rural split published; res / non-res layers instead',
     ])
     dv = T['gem26_bldg_repl_usd_adj'] / T['gem23_bldg_repl_usd_adj'] - 1
@@ -618,8 +642,8 @@ def build(iso, out=None):
         '(stock update plus cost re-basing; see vintage slide)',
         f"GEM's own published total is "
         f"{B(T['gem26_bldg_repl_usd'] + T['gem26_contents_usd'])} INCLUDING "
-        f"{B(T['gem26_contents_usd'])} contents - dropped here so all "
-        'models are structures-only',
+        f"{B(T['gem26_contents_usd'])} contents - dropped here to "
+        'compare buildings only',
         'bottom-up engineering model; '
         + (notes.get('gem') or f'GEM regions matched to the {noun}s by name')
         + ' (map shows v2026)',
@@ -880,8 +904,10 @@ def build(iso, out=None):
             + (f", {G['price_year']} extrapolated" if G['extrapolated']
                else '')
             + "). Contents removed with GEM's contents-to-building ratio "
-            f"({L['contents_ratio']:.0%}).{stock} Each source defines "
-            'non-residential differently.', 9.5, False, SMALL, 0))
+            f"({L['contents_ratio']:.0%}).{stock} GAR15 and GIRI are "
+            'produced capital less urban land and still include machinery '
+            'and equipment. Non-residential is defined differently by '
+            'each source.', 9.5, False, SMALL, 0))
     else:
         fv = sorted(L['floor_vs_gem'].values())
         floor = (f'{fv[0]:.1f}–{fv[-1]:.1f}×' if len(fv) > 1

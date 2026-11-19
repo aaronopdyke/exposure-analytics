@@ -34,8 +34,8 @@
   "adj_suffix": "_adj",
   "models": {
    "gar15": {
-    "year": 2005,
-    "factor": 1.581
+    "year": 2013,
+    "factor": 1.3606
    },
    "giri": {
     "year": 2018,
@@ -54,6 +54,14 @@
     "factor": 1.028
    }
   }
+ },
+ "scope": {
+  "urban_land_markup": 0.24,
+  "factors": {
+   "gar15": 0.8065,
+   "giri": 0.8065
+  },
+  "note": "GAR15 and GIRI are World Bank produced capital, which carries a 24% mark-up for urban land; their comparison values are divided by 1.24 to remove it. Machinery and equipment (and, in GAR15, infrastructure) cannot be separated and remain."
  },
  "vintages": {
   "years": {
@@ -214,13 +222,13 @@
  "models": {
   "gar15": {
    "label": "GAR15 (UNISDR), national total only",
-   "vintage": "2015 (2005 US$)",
+   "vintage": "2015 (~2013 US$)",
    "national_only": true,
    "value": {
     "total": "gar15_usd"
    },
    "floor": null,
-   "note": "Capital stock of buildings (structures, no contents), top-down from WB produced capital. Only the national total is available here - GAR15's per-country grid has no file for this country - so it has no map, regional breakdown or urban/rural split.",
+   "note": "World Bank produced capital assigned to buildings: machinery, equipment and all structures, infrastructure included. Shown less the World Bank's 24% urban-land mark-up, so it still overstates buildings. Only the national total is available here - GAR15's per-country grid has no file for this country - so it has no map, regional breakdown or urban/rural split.",
    "docs": "https://www.preventionweb.net/english/hyogo/gar/2015/en/bgdocs/risk-section/De%20Bono,%20Andrea,%20Bruno%20Chatenoux.%202015.%20A%20Global%20Exposure%20Model%20for%20GAR%202015,%20%20UNEP-GRID.pdf"
   },
   "giri": {
@@ -246,7 +254,7 @@
      ]
     ]
    },
-   "note": "Capital stock of buildings (structures, no contents), 5 km cells assigned by largest overlap. Residential / non-residential layers; no urban/rural split.",
+   "note": "World Bank produced capital less GIRI's infrastructure stock: machinery and equipment are still included. Shown less the World Bank's 24% urban-land mark-up. 5 km cells assigned by largest overlap. Residential / non-residential layers; no urban/rural split.",
    "docs": "https://giri.unepgrid.ch/sites/default/files/2023-09/GIRI_BEM_report_UNIGE.pdf"
   },
   "gem2023": {
@@ -564,9 +572,9 @@
   "msb_value_usd": 510834231884.82,
   "msb_value_usd_urban": 390076413823.2991,
   "msb_value_usd_rural": 120853051616.4795,
-  "giri_total_usd_adj": 600575157623.6521,
-  "giri_res_usd_adj": 263884155953.71634,
-  "giri_nres_usd_adj": 336691001899.1281,
+  "giri_total_usd_adj": 484334804535.20337,
+  "giri_res_usd_adj": 212809803188.48096,
+  "giri_nres_usd_adj": 271525001531.555,
   "gem23_bldg_repl_usd_adj": 444966348679.2223,
   "gem23_res_usd_adj": 355297624969.6724,
   "gem23_com_usd_adj": 49980163998.73515,
@@ -588,6 +596,6 @@
   "msb_value_usd_urban_adj": 401003374026.4162,
   "msb_value_usd_rural_adj": 124238430579.78369,
   "gar15_usd": 1154527750000.0,
-  "gar15_usd_adj": 1825321047543.7754
+  "gar15_usd_adj": 1266782909619.383
  }
 }

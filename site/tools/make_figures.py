@@ -53,8 +53,8 @@ MODELS = [
 ]
 ESTIMATED = {'overture', 'gba', 'msb'}
 MAP_TITLES = {
-    'gar15': 'GAR15 capital stock',
-    'giri': 'GIRI BEM capital stock',
+    'gar15': 'GAR15 produced capital, less urban land',
+    'giri': 'GIRI BEM produced capital, less urban land',
     'gem2023': 'GEM v2023.1.1 building replacement cost',
     'gem2026': 'GEM v2026.0.0 building replacement cost',
     'overture': 'Overture est. replacement value (floor x UCC)',
@@ -66,6 +66,10 @@ MAP_FILES = {'gar15': 'map_gar15.png', 'giri': 'map_giri.png',
              'overture': 'map_overture.png', 'gba': 'map_gba.png',
              'msb': 'map_msb.png'}
 EST_NOTE = '* est. replacement value: floor area x GEM UCC'
+# GAR15 and GIRI are produced capital, not structures-only building stock
+TOPDOWN = {'gar15', 'giri'}
+CAP_NOTE = ('† WB produced capital less urban land: still includes '
+            'machinery and equipment')
 
 
 def money_scale(vmax):
@@ -97,7 +101,8 @@ def make(iso, out=None):
     units = meta.get('units') or {'kind': 'adm1', 'noun': 'region'}
     atolls = units['kind'] == 'atolls'
     models = [m for m in MODELS if m[0] in meta['models']]
-    star = lambda k, lab: lab + ('*' if k in ESTIMATED else '')  # noqa: E731
+    star = lambda k, lab: lab + (                      # noqa: E731
+        '*' if k in ESTIMATED else '†' if k in TOPDOWN else '')
     VG = meta['vintages']['value_growth']['factors']
     FG = meta['vintages']['floor_growth']['factors']
     VIN = meta['vintages']['years']
@@ -187,14 +192,12 @@ def make(iso, out=None):
         axes[0].set_ylim(0, ymax_v / vdiv)
         axes[0].set_title(
             f'Building value, grown to {YR} ({v_basis} path)' if grown
-            else 'Building value (structures, no contents)',
+            else 'Building value by model',
             fontweight='bold', color=NAVY, fontsize=11)
         for i, v in enumerate(vv):
             axes[0].text(i, (v[1] + 0.0115 * ymax_v) / vdiv, vfmt(v[1]),
                          ha='center', fontweight='bold', color=NAVY,
                          fontsize=9.5)
-        axes[0].text(0.02, 0.95, EST_NOTE, transform=axes[0].transAxes,
-                     ha='left', fontsize=8.5, color='#666')
         axes[1].bar([v[0] for v in ff], [v[1] / fdiv for v in ff],
                     color=[v[2] for v in ff], width=0.62)
         axes[1].set_ylabel(f'floor area, {fword}')
@@ -209,7 +212,9 @@ def make(iso, out=None):
                          fontsize=9.5)
         for ax in axes:
             ax.spines[['top', 'right']].set_visible(False)
-        fig.tight_layout()
+        fig.tight_layout(rect=(0, 0.045, 1, 1))
+        fig.text(0.012, 0.012, EST_NOTE + '      ' + CAP_NOTE, ha='left',
+                 fontsize=8.5, color='#666')
         save(fig, fname)
 
     totals_figure('bars_totals.png', grown=False)
@@ -230,7 +235,8 @@ def make(iso, out=None):
     # offsets: +0.25 renders on top within each group; plot top-first so the
     # legend's vertical order matches the bars'
     for off, col, colr, lab in trio:
-        ax.barh(y + off, gg[col] / udiv, height=0.22, color=colr, label=lab)
+        ax.barh(y + off, gg[col] / udiv, height=0.22, color=colr,
+                label=lab + ('†' if lab in ('GAR15', 'GIRI') else ''))
     names = [n.split(' (')[0] for n in gg['name']]
     names = [n if len(n) < 26 else n[:24] + '…' for n in names]
     ax.set_yticks(y, names, fontsize=9.5)
@@ -242,7 +248,8 @@ def make(iso, out=None):
         f'Building value by {what} (native value models)'
         + (f' - top {shown} of {len(g)}' if shown < len(g) else ''),
         fontweight='bold', color=NAVY)
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0.04, 1, 1))
+    fig.text(0.012, 0.012, CAP_NOTE, ha='left', fontsize=8.5, color='#666')
     save(fig, 'adm1_grouped.png')
 
     # ---- comparison: urban / rural ---------------------------------------
@@ -313,13 +320,15 @@ def make(iso, out=None):
     fig.suptitle(f'Observed (pale) vs grown to {YR} (solid) - x1.00 means '
                  f'the data already reflects {YR}', fontweight='bold',
                  color=NAVY, fontsize=12.5)
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0.045, 1, 1))
+    fig.text(0.012, 0.012, EST_NOTE + '      ' + CAP_NOTE, ha='left',
+             fontsize=8.5, color='#666')
     save(fig, 'vintage_growth.png')
 
     # ---- storey-rule sensitivity: footprint models under other rules ------
     SENS = meta.get('sensitivity')
     if SENS:
-        natives = [(lab, T[col], c) for k, lab, col, _, c in models
+        natives = [(star(k, lab), T[col], c) for k, lab, col, _, c in models
                    if k not in ESTIMATED]
         fps = [(lab + '*', k, c) for k, lab, _, _, c in models
                if k in ESTIMATED]
@@ -364,9 +373,9 @@ def make(iso, out=None):
         ax.set_title('Storey-rule sensitivity: hatched band spans integer '
                      'floor/ceil storeys and divisor ±0.25 m',
                      fontweight='bold', color=NAVY, fontsize=11.5)
-        ax.text(0.02, 0.95, EST_NOTE, transform=ax.transAxes, ha='left',
-                fontsize=8.5, color='#666')
-        fig.tight_layout()
+        fig.tight_layout(rect=(0, 0.045, 1, 1))
+        fig.text(0.012, 0.012, EST_NOTE + '      ' + CAP_NOTE, ha='left',
+                 fontsize=8.5, color='#666')
         save(fig, 'bars_sensitivity.png')
 
     # ---- link to GRADE: the models against a GRADE exposure base ----------
@@ -430,7 +439,7 @@ def make(iso, out=None):
                               left=0.215, right=0.97, top=0.94, bottom=0.115)
         ax = fig.add_subplot(gs[0])
         model_bars(ax, L['models'],
-                   'Building value: the models (structures only) and GRADE',
+                   'Building value: the models and GRADE',
                    refs=[(G['total'], False,
                           'GRADE as reported\n{v} incl. contents'),
                          (G['ex_contents'], True,
@@ -465,17 +474,18 @@ def make(iso, out=None):
             city = ('' if pl['name'] == pl['unit']
                     else f" (benchmark city: {pl['name']})")
             model_bars(fig.add_subplot(gs[i]), pl['models'],
-                       f'{what}{city}: building value, structures only',
+                       f'{what}{city}: building value by model',
                        refs=[(pl['usd'], False,
                               f"{b['source']}\n≈{{v}}, {pl['name']}")],
                        bands=pl['bands'])
     else:
         fig = plt.figure(figsize=(7.4, 6.2))
         ax = fig.add_axes([0.215, 0.115, 0.755, 0.825])
-        model_bars(ax, L['models'], 'Building value by model (structures only)',
+        model_bars(ax, L['models'], 'Building value by model',
                    bands=L['bands'])
-    fig.text(0.215, 0.014, EST_NOTE + '   ·   hatched: range across storey '
-             'rules', ha='left', fontsize=8.5, color='#666')
+    fig.text(0.215, 0.034, EST_NOTE + '   ·   hatched: range across storey '
+             'rules', ha='left', fontsize=8, color='#666')
+    fig.text(0.215, 0.010, CAP_NOTE, ha='left', fontsize=8, color='#666')
     # fixed canvas (no tight crop): the slide places this at a known size
     fig.savefig(os.path.join(out, 'grade_link.png'), dpi=200)
     plt.close(fig)

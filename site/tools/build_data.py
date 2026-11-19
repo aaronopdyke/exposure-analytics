@@ -25,12 +25,15 @@ multiplier = GBA floor/footprint ratio per ADM1 x urban/rural class (GBA
 is the one footprint source with modelled heights). No more 1-storey
 assumption.
 
-Value handling: nominal USD columns keep each model's native price year
-(GAR15 2005, GIRI 2018, GEM-2023 2021, GEM-2026/UCC 2024); every
-``*_usd*`` column gets an ``_adj`` sibling in constant latest-year US$
-(WDI US GDP deflator). Overture/GBA/Microsoft values are ESTIMATED as
-floor area x GEM-derived ADM1 UCC (src/ucc.py; excludes contents,
-consistent with GAR15/GIRI which are structures-only).
+Value handling: nominal USD columns keep each model's value as published
+(GAR15 ~2013 US$, GIRI 2018, GEM-2023 2021, GEM-2026/UCC 2024); every
+``*_usd*`` column gets an ``_adj`` sibling - the COMPARISON value used
+everywhere on the site and in the decks: constant latest-year US$ (WDI
+US GDP deflator) and, for GAR15 and GIRI, less the World Bank's 24%
+urban-land mark-up (src/deflate.py: they are produced capital, not
+structures-only building stock, and still include machinery and
+equipment). Overture/GBA/Microsoft values are ESTIMATED as floor area x
+GEM-derived ADM1 UCC (src/ucc.py; excludes contents).
 
 Usage:  py site/tools/build_data.py  [ISO3 ...]     (default: config country)
 """
@@ -117,15 +120,17 @@ def _models(iso, cov, has_msb, gem_split, overture_release,
         'gem', 'GEM regions matched to the display units by region name'))
     m = {
         'gar15': {
-            'label': 'GAR15 (UNISDR)', 'vintage': '2015 (2005 US$)',
+            'label': 'GAR15 (UNISDR)', 'vintage': '2015 (~2013 US$)',
             'value': {'total': 'gar15_usd', 'urban': 'gar15_urban_usd',
                       'rural': 'gar15_rural_usd'},
             'floor': None,
             'breakdown': {'value': [['gar15_urban_usd', 'urban'],
                                     ['gar15_rural_usd', 'rural']]},
-            'note': ('Capital stock of buildings (structures, no contents), '
-                     'top-down from WB produced capital. Native urban/rural '
-                     'split.')},
+            'note': ('World Bank produced capital assigned to buildings: '
+                     'machinery, equipment and all structures, '
+                     'infrastructure included. Shown less the World '
+                     "Bank's 24% urban-land mark-up, so it still "
+                     'overstates buildings. Native urban/rural split.')},
         'giri': {
             'label': 'GIRI BEM (UNEP/GRID)', 'vintage': '~2023 (2018 US$)',
             'value': {'total': 'giri_total_usd'},
@@ -133,9 +138,12 @@ def _models(iso, cov, has_msb, gem_split, overture_release,
             'floor': None,
             'breakdown': {'value': [['giri_res_usd', 'residential'],
                                     ['giri_nres_usd', 'non-res']]},
-            'note': ('Capital stock of buildings (structures, no contents), 5 km '
-                     'cells assigned by largest overlap. Residential / '
-                     'non-residential layers; no urban/rural split.')},
+            'note': ("World Bank produced capital less GIRI's "
+                     'infrastructure stock: machinery and equipment are '
+                     "still included. Shown less the World Bank's 24% "
+                     'urban-land mark-up. 5 km cells assigned by largest '
+                     'overlap. Residential / non-residential layers; no '
+                     'urban/rural split.')},
         'gem2023': {
             'label': 'GEM v2023.1.1', 'vintage': '2023 (2021 US$)',
             'value': {'total': 'gem23_bldg_repl_usd'},
@@ -188,10 +196,13 @@ def _models(iso, cov, has_msb, gem_split, overture_release,
         # national capital stock only: a country total, nothing by unit
         m['gar15'] = {
             'label': 'GAR15 (UNISDR), national total only',
-            'vintage': '2015 (2005 US$)', 'national_only': True,
+            'vintage': '2015 (~2013 US$)', 'national_only': True,
             'value': {'total': 'gar15_usd'}, 'floor': None,
-            'note': ('Capital stock of buildings (structures, no '
-                     'contents), top-down from WB produced capital. '
+            'note': ('World Bank produced capital assigned to buildings: '
+                     'machinery, equipment and all structures, '
+                     'infrastructure included. Shown less the World '
+                     "Bank's 24% urban-land mark-up, so it still "
+                     'overstates buildings. '
                      'Only the national total is available here - '
                      "GAR15's per-country grid has no file for this "
                      'country - so it has no map, regional breakdown '
@@ -241,11 +252,15 @@ def _models(iso, cov, has_msb, gem_split, overture_release,
 
 
 def _adj_factor_for(col):
-    """Deflator multiplier for a nominal USD column, by model prefix."""
+    """Multiplier taking a published USD column to its comparison value,
+    by model prefix: the price deflator and, for GAR15 and GIRI, the
+    removal of the urban-land mark-up."""
     if col.startswith('gar15'):
-        return deflate.factor(deflate.VALUE_YEARS['gar15'])
+        return (deflate.factor(deflate.VALUE_YEARS['gar15'])
+                * deflate.scope_factor('gar15'))
     if col.startswith('giri'):
-        return deflate.factor(deflate.VALUE_YEARS['giri'])
+        return (deflate.factor(deflate.VALUE_YEARS['giri'])
+                * deflate.scope_factor('giri'))
     if col.startswith('gem23'):
         return deflate.factor(deflate.VALUE_YEARS['gem2023'])
     if col.startswith('gem26'):
@@ -481,6 +496,15 @@ def build(iso='MAR'):
                      'source': 'WDI NY.GDP.DEFL.ZS (USA)',
                      'adj_suffix': '_adj',
                      'models': deflate.model_factors()},
+        'scope': {
+            'urban_land_markup': deflate.URBAN_LAND_MARKUP,
+            'factors': {m: round(f, 4)
+                        for m, f in deflate.SCOPE_FACTORS.items()},
+            'note': ('GAR15 and GIRI are World Bank produced capital, '
+                     'which carries a 24% mark-up for urban land; their '
+                     'comparison values are divided by 1.24 to remove '
+                     'it. Machinery and equipment (and, in GAR15, '
+                     'infrastructure) cannot be separated and remain.')},
         'vintages': {
             'years': vint,
             'value_growth': {

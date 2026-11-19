@@ -20,7 +20,7 @@ data_root: null            # null -> auto-detect (env DATA_ROOT / Colab / G:)
 #   msb_regions     Microsoft GlobalML "Location" names ([] = no coverage)
 #   gar15           where UNISDR's per-country GAR15 grid has no file for
 #                   the country: `false` leaves the model out;
-#                   `{national_usd: ...}` (2005 US$, from GAR15's country
+#                   `{national_usd: ...}` (as published, from GAR15's country
 #                   results) shows it as a country total only
 #   gem_name_aliases GEM region name -> display-unit name, where they differ
 #                   (only for countries matched by NAME; MAR has a curated
@@ -115,7 +115,7 @@ countries:
     # same field matches the gridded totals of COL, MAR and MHL to
     # within 1.5%. Shown as a country total only - no map or split.
     gar15:
-      national_usd: 1154527.75e+6   # 2005 US$
+      national_usd: 1154527.75e+6   # as published (~2013 US$, see src/deflate.py)
     unit_names:
       "Vargas": "La Guaira"          # renamed in 2019
       "Anzoategui": "Anzoátegui"
