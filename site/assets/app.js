@@ -14,6 +14,7 @@
   const ISO = window.EXPCMP.iso();
   const ALL_MODELS = ["gar15", "giri", "gem2023", "gem2026", "overture", "gba", "msb"];
   let MODEL_ORDER = ALL_MODELS;   // narrowed to the models this country has
+  let MAP_ORDER = ALL_MODELS;     // ... that have values by unit (mappable)
   const SEG_COLORS = ["#17406D", "#009DD9", "#A5C249", "#0BD0D9"];
 
   const RAMP_SEQ = ["#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#f03b20", "#bd0026"];
@@ -89,9 +90,12 @@
     META = meta;
     FEATURES = geo;
     MODEL_ORDER = ALL_MODELS.filter((mk) => meta.models[mk]);
-    if (!meta.models[S.model]) S.model = MODEL_ORDER[0];
-    if (!meta.models[S.a]) S.a = MODEL_ORDER[0];
-    if (!meta.models[S.b]) S.b = MODEL_ORDER[1];
+    // a model known only as a country total is listed in the totals but
+    // cannot be mapped, compared by unit or shown in a popup
+    MAP_ORDER = MODEL_ORDER.filter((mk) => !meta.models[mk].national_only);
+    if (MAP_ORDER.indexOf(S.model) < 0) S.model = MAP_ORDER[0];
+    if (MAP_ORDER.indexOf(S.a) < 0) S.a = MAP_ORDER[0];
+    if (MAP_ORDER.indexOf(S.b) < 0 || S.b === S.a) S.b = MAP_ORDER[1];
     window.EXPCMP.decorate(meta);   // brand, footer line, nav, switcher
     initMap(geo);
     wireControls();
@@ -354,13 +358,15 @@
     const mx = Math.max(1e-9, ...rows.map((r) => r.v || 0));
     el.innerHTML = rows.map((r) => {
       const na = r.v == null;
+      const nat = !!META.models[r.mk].national_only;
       const sel = (S.mode === "single" && r.mk === S.model);
-      return '<div class="tbar' + (na ? " na" : "") + (sel ? " sel" : "") +
+      return '<div class="tbar' + (na ? " na" : "") + (nat ? " nat" : "") +
+        (sel ? " sel" : "") +
         '" data-mk="' + r.mk + '"><div class="lbl"><b>' + r.label + "</b><span>" +
         (na ? "n.a." : f(r.v)) + '</span></div><div class="track"><div class="fill" style="width:' +
         (na ? 0 : Math.max(2, (100 * r.v) / mx)) + '%"></div></div></div>';
     }).join("");
-    el.querySelectorAll(".tbar:not(.na)").forEach((b) => {
+    el.querySelectorAll(".tbar:not(.na):not(.nat)").forEach((b) => {
       b.addEventListener("click", () => {
         S.mode = "single";
         S.model = b.dataset.mk;
@@ -450,7 +456,7 @@
               rowHtml("A / B", bv > 0 ? (av / bv).toFixed(2) + "×" : null,
                       (x) => x == null ? "–" : x);
     } else {
-      MODEL_ORDER.forEach((mk) => {
+      MAP_ORDER.forEach((mk) => {
         const col = dispCol(colFor(mk, S.metric, S.cls, "total"));
         html += rowHtml(label(mk), col ? p[col] * growFactor(mk) : null, f);
       });
@@ -465,7 +471,7 @@
   function showDetail(lngLat, p) {
     const f = fmt();
     let html = "<h4>" + p.name + " — all models (" + metricLabel() + ")</h4><table>";
-    MODEL_ORDER.forEach((mk) => {
+    MAP_ORDER.forEach((mk) => {
       const col = dispCol(colFor(mk, S.metric, S.cls, "total"));
       html += rowHtml(label(mk), col ? p[col] * growFactor(mk) : null, f);
     });
@@ -495,7 +501,7 @@
 
   function fillModelSelect(sel, pred, current) {
     sel.innerHTML = "";
-    MODEL_ORDER.forEach((mk) => {
+    MAP_ORDER.forEach((mk) => {
       if (!pred(mk)) return;
       const o = document.createElement("option");
       o.value = mk;
@@ -559,12 +565,9 @@
         ? ("Each model grown from its data vintage to " + usdYear() +
            (S.metric === "value"
              ? " along " + (META.vintages.value_growth.short ||
-                 "WB produced capital (CWON)") + " (" +
-               (META.vintages.value_growth.trailing_cagr >= 0
-                 ? "~" + (100 * META.vintages.value_growth.trailing_cagr)
-                     .toFixed(1) + "%/yr recently"
-                 : "down ~" + (-100 * META.vintages.value_growth.trailing_cagr)
-                     .toFixed(1) + "%/yr over the past decade") + ")."
+                 "WB produced capital (CWON)") + " (~" +
+               (100 * META.vintages.value_growth.trailing_cagr).toFixed(1) +
+               "%/yr recently)."
              : " at the GHSL built-up-volume rate (~" +
                (100 * META.vintages.floor_growth.rate).toFixed(1) + "%/yr).") +
            " Use it to test how much of a gap is just data age.")

@@ -10,8 +10,8 @@
   "note": null
  },
  "notes": [
-  "GAR15's per-country release has no file for this country, so six models are compared here instead of seven.",
-  "The WB Wealth Accounts publish no produced-capital series for this country; the vintage adjustment grows values along real GDP instead."
+  "GAR15's per-country grid has no file for this country. Its national capital stock, from GAR15's country results, is shown as a country total only: no map, regional breakdown or urban/rural split.",
+  "The WB Wealth Accounts publish no produced-capital series for this country; the vintage adjustment grows values along GHSL built-up volume instead (its real GDP fell over the last decade, which says little about a building stock that stayed standing)."
  ],
  "coverage": {
   "overture": {
@@ -57,6 +57,7 @@
  },
  "vintages": {
   "years": {
+   "gar15": 2011,
    "giri": 2020,
    "gem2023": 2023,
    "gem2026": 2025,
@@ -65,23 +66,25 @@
    "msb": 2024
   },
   "value_growth": {
-   "source": "WDI real GDP (NY.GDP.MKTP.KD, constant 2015 US$) - the WB Wealth Accounts publish no produced capital for this country, so GDP stands in for the capital path",
-   "basis": "real_gdp",
-   "short": "real GDP (WDI; no produced-capital series published)",
-   "trailing_cagr": -0.1007,
+   "source": "GHSL Built-up Volume 2010-2020 growth rate - the WB Wealth Accounts publish no produced capital for this country and its real GDP fell over the last decade, which says little about a building stock that stayed standing",
+   "basis": "built_volume",
+   "short": "GHSL built-up volume (no produced-capital series; GDP fell over the decade)",
+   "trailing_cagr": 0.0086,
    "factors": {
-    "giri": 1.212,
-    "gem2023": 1.072,
+    "gar15": 1.127,
+    "giri": 1.044,
+    "gem2023": 1.017,
     "gem2026": 1.0,
     "overture": 1.0,
-    "gba": 1.072,
-    "msb": 1.016
+    "gba": 1.017,
+    "msb": 1.009
    }
   },
   "floor_growth": {
    "source": "GHSL Built-up Volume 2010-2020",
    "rate": 0.0086,
    "factors": {
+    "gar15": 1.127,
     "giri": 1.044,
     "gem2023": 1.017,
     "gem2026": 1.0,
@@ -209,6 +212,17 @@
   }
  },
  "models": {
+  "gar15": {
+   "label": "GAR15 (UNISDR), national total only",
+   "vintage": "2015 (2005 US$)",
+   "national_only": true,
+   "value": {
+    "total": "gar15_usd"
+   },
+   "floor": null,
+   "note": "Capital stock of buildings (structures, no contents), top-down from WB produced capital. Only the national total is available here - GAR15's per-country grid has no file for this country - so it has no map, regional breakdown or urban/rural split.",
+   "docs": "https://www.preventionweb.net/english/hyogo/gar/2015/en/bgdocs/risk-section/De%20Bono,%20Andrea,%20Bruno%20Chatenoux.%202015.%20A%20Global%20Exposure%20Model%20for%20GAR%202015,%20%20UNEP-GRID.pdf"
+  },
   "giri": {
    "label": "GIRI BEM (UNEP/GRID)",
    "vintage": "~2023 (2018 US$)",
@@ -572,6 +586,8 @@
   "gba_value_usd_rural_adj": 152284787823.94553,
   "msb_value_usd_adj": 525143903334.7936,
   "msb_value_usd_urban_adj": 401003374026.4162,
-  "msb_value_usd_rural_adj": 124238430579.78369
+  "msb_value_usd_rural_adj": 124238430579.78369,
+  "gar15_usd": 1154527750000.0,
+  "gar15_usd_adj": 1825321047543.7754
  }
 }

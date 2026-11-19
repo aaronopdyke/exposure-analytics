@@ -110,7 +110,9 @@ def make(iso, out=None):
         plt.close(fig)
 
     # ---- per-model maps: ONE shared colour scale across all models -------
-    vmax = float(g[[m[2] for m in models]].max().max())
+    # (a model known only as a country total has no unit values to map)
+    mapped = [m for m in models if m[2] in g.columns]
+    vmax = float(g[[m[2] for m in mapped]].max().max())
     _, _, mfmt = money_scale(vmax)
     # Every map is the same canvas with the map, colour bar and title in
     # fixed places (no tight-bbox crop, which re-centres the picture on
@@ -123,7 +125,7 @@ def make(iso, out=None):
     main = g[~g['code'].isin(inset_codes)]
     minx, miny, maxx, maxy = main.total_bounds
     pad = 0.02 * max(maxx - minx, maxy - miny)
-    for key, _, col, _, _ in models:
+    for key, _, col, _, _ in mapped:
         fig = plt.figure(figsize=(7.2, 6.0))
         ax = fig.add_axes([0.01, 0.01, 0.80, 0.89])
         cax = fig.add_axes([0.85, 0.24, 0.028, 0.50])
@@ -169,8 +171,9 @@ def make(iso, out=None):
     # (only the bars move): y-limits come from the grown maxima
     vals = [(star(k, lab), T[col], c, k) for k, lab, col, _, c in models]
     fl = [(lab, T[fcol], c, k) for k, lab, _, fcol, c in models if fcol]
-    ymax_v = max(v * VG[k] for _, v, _, k in vals) * 1.14
-    ymax_f = max(v * FG[k] for _, v, _, k in fl) * 1.14
+    # one axis for the as-published and the grown chart
+    ymax_v = max(v * max(VG[k], 1) for _, v, _, k in vals) * 1.14
+    ymax_f = max(v * max(FG[k], 1) for _, v, _, k in fl) * 1.14
     vdiv, vword, vfmt = money_scale(ymax_v / 1.14)
     fdiv, fword, ffmt = area_scale(ymax_f / 1.14)
 
@@ -244,7 +247,7 @@ def make(iso, out=None):
 
     # ---- comparison: urban / rural ---------------------------------------
     ur = []
-    if 'gar15' in meta['models']:
+    if 'gar15_urban_usd_adj' in T:
         ur.append(('GAR15 value\n(all sectors)', T['gar15_urban_usd_adj'],
                    T['gar15_rural_usd_adj']))
     if 'urban' in meta['models']['gem2026']['value']:
@@ -301,10 +304,8 @@ def make(iso, out=None):
     ax.set_ylabel(f'{usdlab}, {gword}')
     top = max(adj) * 1.15
     ax.set_ylim(0, top / gdiv)
-    v_rate = (f'~{100 * v_cagr:.1f}%/yr recently' if v_cagr >= 0 else
-              f'down ~{-100 * v_cagr:.1f}%/yr over the past decade')
-    ax.set_title(f'Value: grown along {v_basis} ({v_rate})',
-                 fontweight='bold', color=NAVY, fontsize=10.5)
+    ax.set_title(f'Value: grown along {v_basis} (~{100 * v_cagr:.1f}%/yr '
+                 'recently)', fontweight='bold', color=NAVY, fontsize=10.5)
     for i, a in enumerate(adj):
         ax.text(i + 0.2, (a + 0.011 * top) / gdiv, gfmt(a), ha='center',
                 fontsize=8.5, fontweight='bold', color=NAVY)
@@ -375,10 +376,12 @@ def make(iso, out=None):
     L = grade.link(iso, meta, g)
     colour = {k: c for k, _, _, _, c in MODELS}
 
-    def model_bars(ax, vals, title, refs=()):
+    def model_bars(ax, vals, title, refs=(), bands=None):
         """Horizontal model bars, deck order top-down; refs = [(value,
         dashed, label)] drawn as orange reference lines, labelled in the
-        empty row above the bars."""
+        empty row above the bars; bands = {label: (low, high)} drawn as
+        the hatched storey-rule range of the sensitivity chart."""
+        bands = bands or {}
         labs = list(vals)
         n = len(labs)
         top = max(list(vals.values()) + [r[0] for r in refs])
@@ -387,12 +390,18 @@ def make(iso, out=None):
         # a single reference line is labelled on whichever side has room;
         # only a label reading rightwards needs space beyond its line
         lone_left = len(refs) == 1 and refs[0][0] > 0.6 * max(vals.values())
-        xmax = max(max(vals.values()) * 1.1,
+        xmax = max(max(list(vals.values())
+                       + [hi for _, hi in bands.values()]) * 1.1,
                    max([r[0] for r in refs] or [0])
                    * (1.08 if lone_left else 1.42))
         for i, lab in enumerate(labs):
             k = L['keys'][lab]
             ax.barh(n - 1 - i, vals[lab] / div, height=0.62, color=colour[k])
+            if lab in bands:
+                lo, hi = bands[lab]
+                ax.barh(n - 1 - i, (hi - lo) / div, left=lo / div,
+                        height=0.62, facecolor='white', alpha=0.45,
+                        edgecolor=colour[k], linewidth=1.2, hatch='///')
         ax.set_yticks([n - 1 - i for i in range(n)],
                       [f'{star(L["keys"][lab], lab)}  {fmt(vals[lab])}'
                        for lab in labs], fontsize=9.5)
@@ -426,7 +435,8 @@ def make(iso, out=None):
                           'GRADE as reported\n{v} incl. contents'),
                          (G['ex_contents'], True,
                           'GRADE less contents\n{v} '
-                          f"(GEM's {L['contents_ratio']:.0%})")])
+                          f"(GEM's {L['contents_ratio']:.0%})")],
+                   bands=L['bands'])
         ax2 = fig.add_subplot(gs[1])
         sh = [('GRADE', G['nonres_share'], ORANGE),
               ('GEM v2026', L['nonres_share']['GEM v2026'], BRIGHT),
@@ -457,12 +467,15 @@ def make(iso, out=None):
             model_bars(fig.add_subplot(gs[i]), pl['models'],
                        f'{what}{city}: building value, structures only',
                        refs=[(pl['usd'], False,
-                              f"{b['source']}\n≈{{v}}, {pl['name']}")])
+                              f"{b['source']}\n≈{{v}}, {pl['name']}")],
+                       bands=pl['bands'])
     else:
         fig = plt.figure(figsize=(7.4, 6.2))
         ax = fig.add_axes([0.215, 0.115, 0.755, 0.825])
-        model_bars(ax, L['models'], 'Building value by model (structures only)')
-    fig.text(0.215, 0.014, EST_NOTE, ha='left', fontsize=8.5, color='#666')
+        model_bars(ax, L['models'], 'Building value by model (structures only)',
+                   bands=L['bands'])
+    fig.text(0.215, 0.014, EST_NOTE + '   ·   hatched: range across storey '
+             'rules', ha='left', fontsize=8.5, color='#666')
     # fixed canvas (no tight crop): the slide places this at a known size
     fig.savefig(os.path.join(out, 'grade_link.png'), dpi=200)
     plt.close(fig)

@@ -45,6 +45,49 @@ REVIEW = {
 }
 
 
+def unit_bands(units, meta):
+    """{unit code: {model label: (low, high)}} - each footprint model's value
+    in constant US$ under the alternative storey rules of the sensitivity
+    slide, recomputed per unit exactly as build_data._sensitivity does
+    nationally (GBA floor/ceil storeys and divisor +/-0.25 m; Overture and
+    Microsoft through the GBA multiplier)."""
+    import pandas as pd
+    u = units.set_index('code')
+    fp = u['gba_footprint_m2']
+
+    def gba_floor(key):
+        if key == 'baseline':
+            return u['gba_floor_area_m2']
+        if key == 'floor':
+            return u['gba_floor_floor_m2']
+        if key == 'ceil':
+            return u['gba_floor_ceil_m2']
+        d = -0.25 if key == 'div_minus' else 0.25
+        return (u['gba_volume_t1_m3'] / (3.0 + d)
+                + u['gba_volume_t2_m3'] / (3.25 + d)
+                + u['gba_volume_t3_m3'] / (3.5 + d))
+
+    rate = pd.Series(meta['ucc']['per_adm1_usd_m2']).reindex(u.index)
+    adj = meta['deflator']['models']['ucc']['factor']
+    labels = {k: lab for k, lab, _ in MODELS
+              if k in FOOTPRINT and k in meta['models']}
+    vals = {lab: [] for lab in labels.values()}
+    for key in meta['sensitivity']:
+        gf = gba_floor(key)
+        mult = (gf / fp.where(fp > 0)).fillna(gf.sum() / fp.sum())
+        for k, lab in labels.items():
+            floor = gf if k == 'gba' else (
+                u[f'{k}_floor_known_m2'] + u[f'{k}_fp_unknown_m2'] * mult)
+            vals[lab].append(floor * rate * adj)
+    out = {}
+    for lab, series in vals.items():
+        frame = pd.concat(series, axis=1)
+        for code, lo, hi in zip(frame.index, frame.min(axis=1),
+                                frame.max(axis=1)):
+            out.setdefault(code, {})[lab] = (float(lo), float(hi))
+    return out
+
+
 def link(iso, meta, units):
     """Everything the GRADE slide states, for one country.
 
@@ -59,7 +102,9 @@ def link(iso, meta, units):
     # spread inside a unit: Microsoft is left out (its coverage gaps are
     # reported on its own slide and would otherwise read as disagreement),
     # and only units holding >= 1% of the stock count
-    cols = [col for k, _, col in present if k != 'msb']
+    # (a model known only as a national total has no unit column)
+    cols = [col for k, _, col in present
+            if k != 'msb' and col in units.columns]
     m = units[cols]
     share = (m / m.sum()).mean(axis=1)
     sp = (m.max(axis=1) / m.min(axis=1).where(m.min(axis=1) > 0))
@@ -85,6 +130,13 @@ def link(iso, meta, units):
                          for k, lab, _ in present if k in FOOTPRINT},
         'grade': None,
         'benchmarks': [],
+        # storey-rule range of each footprint model (sensitivity slide)
+        'bands': {lab: (
+            min(sc['models'][k]['value_usd_adj']
+                for sc in meta['sensitivity'].values()),
+            max(sc['models'][k]['value_usd_adj']
+                for sc in meta['sensitivity'].values()))
+            for k, lab, _ in present if k in FOOTPRINT},
     }
 
     gr = cfg.get('grade')
@@ -118,6 +170,7 @@ def link(iso, meta, units):
         }
 
     name = units['name'].str.split(' (', regex=False).str[0]
+    ubands = unit_bands(units, meta) if cfg.get('benchmarks') else {}
     for b in cfg.get('benchmarks') or []:
         f, _ = deflate.price_factor(b.get('price_year', yr))
         places = []
@@ -127,9 +180,11 @@ def link(iso, meta, units):
                 raise LookupError(f"{iso}: benchmark unit {p['unit']!r} is "
                                   'not a display unit')
             row = row.iloc[0]
-            mv = {lab: float(row[col]) for _, lab, col in present}
+            mv = {lab: float(row[col]) for _, lab, col in present
+                  if col in units.columns}
             places.append({'name': p['name'], 'unit': p['unit'],
                            'usd': p['usd'] * f, 'models': mv,
+                           'bands': ubands.get(row['code'], {}),
                            'ratio': {lab: v / (p['usd'] * f)
                                      for lab, v in mv.items()}})
         out['benchmarks'].append({'source': b['source'], 'places': places})

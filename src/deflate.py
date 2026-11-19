@@ -62,6 +62,21 @@ VALUE_BASES = {
                    'country, so GDP stands in for the capital path'),
         'short': 'real GDP (WDI; no produced-capital series published)'},
 }
+# Third choice: where there is no produced-capital series AND the GDP
+# stand-in FELL over the trailing decade (Venezuela), GDP says little
+# about a building stock that stayed standing - growing a 2011 capital
+# stock along it would shrink it by two-thirds. Values then grow at the
+# physical rate used for floor area (GHSL built-up volume), i.e. real
+# value per square metre is held constant.
+BUILT_BASIS = {
+    'indicator': None,
+    'source': ('GHSL Built-up Volume 2010-2020 growth rate - the WB '
+               'Wealth Accounts publish no produced capital for this '
+               'country and its real GDP fell over the last decade, '
+               'which says little about a building stock that stayed '
+               'standing'),
+    'short': ('GHSL built-up volume (no produced-capital series; GDP '
+              'fell over the decade)')}
 FALLBACK_CAPITAL_CAGR = 0.057   # MAR trailing-10y, verified 2026-07
 FALLBACK_BUILTV_RATE = 0.015    # MAR GHS-BUILT-V 2010-2020 CAGR
 
@@ -115,6 +130,19 @@ def value_series(iso):
     raise LookupError(f'no produced-capital or real-GDP series for {iso}')
 
 
+def _gdp_shrinking(iso):
+    """True where values would grow along the real-GDP stand-in and that
+    series is lower now than a decade ago."""
+    try:
+        basis, s = value_series(iso)
+    except Exception:
+        return False
+    if basis != 'real_gdp':
+        return False
+    last = max(s)
+    return s[last] < s[max(min(s), last - 10)]
+
+
 def value_basis(iso):
     """VALUE_BASES entry (+ 'basis' key) describing the country's value
     growth series; the fallback constant when nothing could be fetched."""
@@ -124,6 +152,8 @@ def value_basis(iso):
         return {'basis': 'fallback', 'indicator': None,
                 'source': f'assumed {FALLBACK_CAPITAL_CAGR:.1%}/yr (no series)',
                 'short': 'an assumed constant rate'}
+    if _gdp_shrinking(iso):
+        return dict(BUILT_BASIS, basis='built_volume')
     return dict(VALUE_BASES[basis], basis=basis)
 
 
@@ -135,6 +165,8 @@ def produced_capital_series(iso):
 
 def capital_cagr(iso, window=10):
     """Trailing-{window}-year CAGR of the value-growth series."""
+    if _gdp_shrinking(iso):
+        return builtv_growth_rate(iso)
     try:
         s = produced_capital_series(iso)
     except Exception:
@@ -150,6 +182,8 @@ def capital_cagr(iso, window=10):
 def capital_growth_factor(iso, from_year, to_year):
     """K(to)/K(from) along the produced-capital path; years beyond the
     last observation extrapolate at the trailing-10y CAGR."""
+    if _gdp_shrinking(iso):
+        return floor_growth_factor(iso, from_year, to_year)
     try:
         s = produced_capital_series(iso)
     except Exception:

@@ -100,9 +100,10 @@ cached on the Drive.
 
 1. Add it under `countries:` in `config.yaml` — display name, the GEM
    v2023.1.1 folder, Microsoft's region name (or `[]` if Microsoft has no
-   tiles there). Set `gar15: false` if GAR15's per-country release has no
-   file for it (Venezuela), and `unit_names` where the WB layer carries an
-   outdated or unaccented unit name.
+   tiles there). If GAR15's per-country grid has no file for it, set
+   `gar15: false`, or give its national capital stock from GAR15's country
+   results as `gar15: {national_usd: ...}` (Venezuela). Use `unit_names`
+   where the WB layer carries an outdated or unaccented unit name.
 2. Run `build_data.py <ISO>`. GEM regions are matched to the WB units by
    name; if the build stops on an unmatched region, add it to
    `gem_name_aliases`.
@@ -125,8 +126,12 @@ separately (Morocco / Western Sahara, curated in `src/gem.py` and
 (Marshall Islands — set `units:` to split the WB coastline into atolls).
 
 A model a country lacks is left out everywhere — site, figures and deck —
-and the country is compared on the models that remain: no Microsoft tiles
-over the Marshall Islands, no GAR15 country file for Venezuela.
+and the country is compared on the models that remain (no Microsoft tiles
+over the Marshall Islands). Venezuela has no GAR15 grid file, so GAR15
+appears there as a national total only: in the totals and charts, not on
+the map. Where a country has no produced-capital series and its GDP fell
+over the last decade (Venezuela again), the vintage adjustment grows values
+at the built-up-volume rate instead of along GDP.
 
 ## License
 

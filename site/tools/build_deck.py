@@ -298,18 +298,18 @@ def build(iso, out=None):
     VG = meta['vintages']['value_growth']
     FG = meta['vintages']['floor_growth']
     gdp_basis = VG.get('basis') == 'real_gdp'
-    cagr = VG['trailing_cagr']
-    # a shrinking series (Venezuela's GDP) reads better as "down x%/yr"
-    rate_txt = (f'~{cagr:.1%}/yr recently' if cagr >= 0 else
-                f'down ~{-cagr:.1%}/yr over the past decade')
+    # no produced capital and a GDP that fell: values grow at the
+    # built-up-volume rate instead (src/deflate.py)
+    built_basis = VG.get('basis') == 'built_volume'
+    rate_txt = f"~{VG['trailing_cagr']:.1%}/yr recently"
     value_path = (
+        f"the GHSL built-up-volume rate (~{VG['trailing_cagr']:.1%}/yr; "
+        f'no produced-capital series is published for {CTY} and its GDP '
+        'fell over the decade while the buildings stayed standing)'
+        if built_basis else
         f'real GDP (WDI NY.GDP.MKTP.KD, {rate_txt} - the WB Wealth Accounts '
         f'publish no produced capital for {CTY})' if gdp_basis else
         f'the WB produced-capital path (CWON NW.PCA.TO, {rate_txt})')
-    # output can collapse while the buildings stay standing
-    weak_path = (' GDP is a weak guide to the building stock here: output '
-                 'fell far more than buildings did, so read the grown values '
-                 'as indicative.' if gdp_basis and cagr < 0 else '')
 
     native = {'GAR15': ('gar15_usd_adj', 'gar15'),
               'GIRI': ('giri_total_usd_adj', 'giri'),
@@ -317,6 +317,8 @@ def build(iso, out=None):
               'GEM v2026': ('gem26_bldg_repl_usd_adj', 'gem2026')}
     native = {n: v for n, v in native.items() if v[1] in M}
     has_gar = 'gar15' in M
+    # GAR15 by unit (map, regions, urban/rural) vs a national total only
+    gar_grid = has_gar and not M['gar15'].get('national_only')
     nat = {n: T[c] for n, (c, _) in native.items()}
     nat_grown = {n: T[c] * VG['factors'][k] for n, (c, k) in native.items()}
     ratio = max(nat.values()) / min(nat.values())
@@ -354,7 +356,12 @@ def build(iso, out=None):
         msb_card = ('Microsoft GlobalML — not available', MUTED,
                     f'no tiles published over {CTY}; {NUM_WORD[n_models]} '
                     'models are compared instead of seven', True)
-    if has_gar:
+    if has_gar and not gar_grid:
+        gar_card = ('GAR15 — national total only', BLUE,
+                    "UNISDR; national capital stock from GAR15's "
+                    f'country results - no ~5 km grid file for {CTY}, '
+                    'so no map or regional split', False)
+    elif has_gar:
         gar_card = ('GAR15 — Global Assessment Report 2015', BLUE,
                     'UN Int. Strategy for Disaster Reduction (UNISDR); ~5 km '
                     'point grid, ~2011 inputs; native urban/rural split',
@@ -454,11 +461,13 @@ def build(iso, out=None):
     text_block(s, 0.75, 5.95, 11.8, [
         ('Identical charts to the previous slide, but each model is grown '
          f'from its data vintage: values along {value_path}, floor areas at '
-         f"the GHSL built-up-volume rate (~{FG['rate']:.1%}/yr). {old_n} "
+         + ('the same rate' if built_basis else
+            f"the GHSL built-up-volume rate (~{FG['rate']:.1%}/yr)")
+         + f'. {old_n} '
          f"({meta['vintages']['years'][old_k]} inputs, x{old_f:.2f}) "
          f'{old_verb} {B(nat_grown[old_n])}.', 12.5, False, GREY, 8),
         (f'Growing every model to a common stock year {verdict} Factors of '
-         f'x1.00 mean the data already reflects {YR}.{weak_path}',
+         f'x1.00 mean the data already reflects {YR}.',
          12.5, False, GREY, 0),
     ])
 
@@ -537,7 +546,7 @@ def build(iso, out=None):
 
     est_sub = f'ESTIMATED replacement value = floor area × GEM UCC, {USD}'
 
-    if has_gar:
+    if gar_grid:
         model_slide('GAR15 — UNISDR Global Exposure Dataset (2015)',
             'map_gar15.png', B(T['gar15_usd_adj']),
             f'capital stock of buildings, {USD}', [
@@ -551,6 +560,38 @@ def build(iso, out=None):
             '(1 km at the coast) using population and GDP proxies',
             'source: HDX per-country shapefiles'
             + (f"; {notes['gar15']}" if notes.get('gar15') else ''),
+        ])
+    if has_gar and not gar_grid:
+        allv = dict(nat, **{fp_label[p]: v for p, v in fpv.items()})
+        rank = sorted(allv, key=allv.get, reverse=True)
+        top_txt = (
+            f'the highest of the {NUM_WORD[n_models]} models here: '
+            f"{allv['GAR15'] / allv[rank[1]]:.1f}× the next highest "
+            f'({rank[1]})' if rank[0] == 'GAR15' else
+            f'ranks {rank.index("GAR15") + 1} of the '
+            f'{NUM_WORD[n_models]} models here')
+        sl = content_slide(
+            prs, lay, 'GAR15 — UNISDR Global Exposure Dataset (2015)')
+        _box(sl, 0.6, 1.6, 6.3, 4.9, TINT)
+        text_block(sl, 1.0, 3.2, 5.5, [
+            ('National total only', 24, True, NAVY, 8),
+            ("GAR15's per-country grid has no file for "
+             f'{CTY}, so there is no map, regional breakdown or '
+             'urban/rural split.', 13, False, GREY, 0)])
+        text_block(sl, 7.5, 1.6, 5.5, [
+            (B(T['gar15_usd_adj']), 30, True, NAVY, 2),
+            (f'capital stock of buildings, {USD}', 13, False, BLUE, 16),
+            (f"–  {B(T['gar15_usd'])} in its native 2005 US$ (WB "
+             'produced capital, structures - no contents)', 12.5, False,
+             GREY, 8),
+            ("–  national figure from GAR15's country results; that "
+             'field matches the gridded totals of Colombia, Morocco '
+             'and the Marshall Islands to within 1.5%', 12.5, False,
+             GREY, 8),
+            ('–  top-down: national capital stock that GAR15 spreads '
+             'over a ~5 km grid using population and GDP proxies',
+             12.5, False, GREY, 8),
+            (f'–  {top_txt}', 12.5, False, GREY, 8),
         ])
     model_slide('GIRI — Building Exposure Model (~2023)',
         'map_giri.png', B(T['giri_total_usd_adj']),
@@ -674,6 +715,9 @@ def build(iso, out=None):
                      f'growth: v2023 grown to {YR} is {B(g23_g)} against '
                      f"v2026's {B(g26)}.")
     series = (
+        f'the GHSL built-up-volume rate for {CTY} (no produced-capital '
+        'series is published, and GDP fell over the decade while the '
+        'buildings stayed standing)' if built_basis else
         f'real GDP for {CTY} (WDI NY.GDP.MKTP.KD - the WB Wealth Accounts '
         'publish no produced capital here)' if gdp_basis else
         f'the WB Wealth Accounts produced-capital series for {CTY} '
@@ -686,8 +730,10 @@ def build(iso, out=None):
         (f'Growth rates are data-driven, not assumed: values follow {series}, '
          f'floor areas the GHSL built-up-volume rate. {age_line}',
          12.5, False, GREY, 8),
-        ('(Floor areas grow far more slowly - GHSL built-up volume, ~'
-         f"{FG['rate']:.1%}/yr - so age barely moves them.) {gem_story}",
+        (('(Floor areas grow at the same rate.) ' if built_basis else
+          '(Floor areas grow far more slowly - GHSL built-up volume, ~'
+          f"{FG['rate']:.1%}/yr - so age barely moves them.) ")
+         + gem_story,
          12.5, False, GREY, 0),
     ])
 
@@ -732,7 +778,7 @@ def build(iso, out=None):
 
     # ---- urban / rural -------------------------------------------------------
     ur = {}
-    if has_gar:
+    if gar_grid:
         ur['GAR15'] = (T['gar15_urban_usd_adj'], T['gar15_rural_usd_adj'])
     if gem_split:
         ur['GEM v2026'] = (T['gem26_res_urban_usd_adj'],
@@ -744,10 +790,10 @@ def build(iso, out=None):
     lo_k, hi_k = min(us, key=us.get), max(us, key=us.get)
     agree = us[hi_k] - us[lo_k] <= 0.25
     gem_res = '(residential only — COM/IND have no settlement tag)'
-    if has_gar and gem_split:
+    if gar_grid and gem_split:
         own = ('GAR15 and GEM v2026 publish their own urban/rural splits '
                f'(GEM: {gem_res[1:]}.')
-    elif has_gar:
+    elif gar_grid:
         own = ('GAR15 publishes its own urban/rural split; GEM publishes '
                f'none for {CTY}.')
     elif gem_split:
@@ -756,7 +802,7 @@ def build(iso, out=None):
         own = f'No model publishes its own urban/rural split for {CTY}.'
     grid_note = (
         ('GAR15 applies its own urban mask to capital stock, while the '
-         if has_gar else 'The ')
+         if gar_grid else 'The ')
         + 'footprint sources share one DEGURBA grid - so differences among '
         'them reflect which buildings each maps, not definitions.')
     s = content_slide(prs, lay, 'Urban vs rural: '
@@ -781,6 +827,12 @@ def build(iso, out=None):
     n_word = NUM_WORD[n_models]
     lo_v, hi_v = L['models'][L['lo']], L['models'][L['hi']]
     med_u = L['unit_spread_median']
+    # storey-rule range of the footprint estimates (hatched on the chart)
+    band_txt = (
+        ' Other storey rules put the footprint estimates between '
+        f"{B(min(lo for lo, _ in L['bands'].values()))} and "
+        f"{B(max(hi for _, hi in L['bands'].values()))}."
+        if L['bands'] else '')
     within = (f', and by more within a single {noun} (median {med_u:.1f}×)'
               if med_u and med_u > L['spread'] * 1.05 else '')
     s = content_slide(prs, lay, 'What this means for GRADE: the exposure base')
@@ -800,8 +852,8 @@ def build(iso, out=None):
              f"contents ({G['price_year']} US$)", 12.5, False, BLUE, 10),
             (f"–  Like for like, GRADE's buildings are worth "
              f"{B(G['ex_contents'])} ({USD}, contents removed). The models "
-             f"range from {B(lo_v)} ({L['lo']}) to {B(hi_v)} ({L['hi']}).",
-             12.5, False, GREY, 8),
+             f"range from {B(lo_v)} ({L['lo']}) to {B(hi_v)} ({L['hi']})."
+             f'{band_txt}', 12.5, False, GREY, 8),
             (f"–  GRADE puts {G['nonres_share']:.0%} of building value in "
              'non-residential buildings. GEM v2026 puts '
              f"{L['nonres_share']['GEM v2026']:.0%} there and GIRI "

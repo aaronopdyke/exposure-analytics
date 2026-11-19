@@ -18,8 +18,10 @@ data_root: null            # null -> auto-detect (env DATA_ROOT / Colab / G:)
 #   label           long label for meta.json (defaults to name)
 #   gem2023_path    folder of the GEM v2023.1.1 per-country summary
 #   msb_regions     Microsoft GlobalML "Location" names ([] = no coverage)
-#   gar15           false where UNISDR's per-country GAR15 release has no
-#                   file for the country (the model is then left out)
+#   gar15           where UNISDR's per-country GAR15 grid has no file for
+#                   the country: `false` leaves the model out;
+#                   `{national_usd: ...}` (2005 US$, from GAR15's country
+#                   results) shows it as a country total only
 #   gem_name_aliases GEM region name -> display-unit name, where they differ
 #                   (only for countries matched by NAME; MAR has a curated
 #                   code crosswalk in src/gem.py)
@@ -106,10 +108,14 @@ countries:
     name: "Venezuela"
     gem2023_path: "South_America/Venezuela"
     msb_regions: ["Venezuela"]
-    # GAR15's per-country release (HDX, mirrored by Stanford) has no
+    # GAR15's per-country grid (HDX, mirrored by Stanford) has no
     # Venezuela file, and the original UNISDR/GRID download hosts are
-    # offline - six models are compared here.
-    gar15: false
+    # offline. The national capital stock is TOT_STOCK (US$ million) for
+    # VEN in GAR15's country results (Stanford purl nd563yc9685); the
+    # same field matches the gridded totals of COL, MAR and MHL to
+    # within 1.5%. Shown as a country total only - no map or split.
+    gar15:
+      national_usd: 1154527.75e+6   # 2005 US$
     unit_names:
       "Vargas": "La Guaira"          # renamed in 2019
       "Anzoategui": "Anzoátegui"

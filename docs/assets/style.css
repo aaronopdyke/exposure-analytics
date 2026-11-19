@@ -55,6 +55,7 @@ select { width: 100%; font: inherit; font-size: 0.88rem; padding: 0.35rem 0.4rem
 .tbar .fill { height: 100%; border-radius: 4px; background: var(--accent); }
 .tbar.na .fill { background: #ccc; }
 .tbar.na { opacity: 0.5; cursor: default; }
+.tbar.nat { cursor: default; }   /* country total only: not mappable */
 .tbar.sel .lbl b { color: var(--accent); }
 
 .map-wrap { display: flex; flex-direction: column; min-height: 0; }

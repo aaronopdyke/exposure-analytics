@@ -14,7 +14,9 @@ more); afterwards they are read from the Drive cache.
 Seven models: GAR15, GIRI, GEM v2023.1.1, GEM v2026.0.0, Overture, GBA,
 Microsoft GlobalML. Two can be missing for a country and are then left
 out everywhere: Microsoft where it publishes no tiles, GAR15 where the
-per-country release has no file (config `gar15: false`).
+per-country grid has no file (config `gar15: false`). Where only GAR15's
+national capital stock is known (config `gar15: {national_usd}`) it is
+carried as a country total: in the totals, not on the map.
 Countries are configured in config.yaml (`countries:`).
 
 Floor areas for Overture/Microsoft: reported num_floors/height where
@@ -104,7 +106,7 @@ def _attr_phrase(share):
 
 
 def _models(iso, cov, has_msb, gem_split, overture_release,
-            has_gar15=True):
+            has_gar15=True, gar_nat=None):
     cc = country(iso)
     est = ('Replacement value ESTIMATED as floor area x GEM-derived unit '
            'construction cost per unit (2024 US$, excl. contents).')
@@ -182,7 +184,19 @@ def _models(iso, cov, has_msb, gem_split, overture_release,
                      'via the 3-tier storey divisor; missing heights = 1 '
                      f'storey. Calibrates the other footprint sources. {est}')},
     }
-    if not has_gar15:
+    if not has_gar15 and gar_nat:
+        # national capital stock only: a country total, nothing by unit
+        m['gar15'] = {
+            'label': 'GAR15 (UNISDR), national total only',
+            'vintage': '2015 (2005 US$)', 'national_only': True,
+            'value': {'total': 'gar15_usd'}, 'floor': None,
+            'note': ('Capital stock of buildings (structures, no '
+                     'contents), top-down from WB produced capital. '
+                     'Only the national total is available here - '
+                     "GAR15's per-country grid has no file for this "
+                     'country - so it has no map, regional breakdown '
+                     'or urban/rural split.')}
+    elif not has_gar15:
         del m['gar15']
     if has_msb:
         sparse = cov['msb']['sparse_units']
@@ -339,7 +353,9 @@ def build(iso='MAR'):
     adm1 = admin1(iso)
     include_esh = (adm1['ADM1CD_c'] == 'ESH000').any()
     has_msb = bool(buildings.msb_regions(iso))
-    has_gar15 = cc.get('gar15', True) is not False
+    gcfg = cc.get('gar15', True)
+    has_gar15 = gcfg is True                 # gridded country file
+    gar_nat = gcfg if isinstance(gcfg, dict) else None
     footprint = [p for p in FOOTPRINT_MODELS if p != 'msb' or has_msb]
 
     if has_gar15:
@@ -351,7 +367,8 @@ def build(iso='MAR'):
               f"{wide['gar15_usd'].sum() / g15['gar15_usd'].sum():.1%}"
               ' of the country file')
     else:
-        print('GAR15: no country file published - left out')
+        print('GAR15: no country grid published - '
+              + ('national total only' if gar_nat else 'left out'))
         wide = adm1.copy()
 
     print('GIRI ...')
@@ -414,14 +431,24 @@ def build(iso='MAR'):
 
     # ---- meta.json ----
     totals = {c: float(wide[c].sum()) for c in num_cols}
+    if gar_nat:
+        totals['gar15_usd'] = float(gar_nat['national_usd'])
+        totals['gar15_usd_adj'] = (totals['gar15_usd']
+                                   * _adj_factor_for('gar15_usd'))
     basis = deflate.value_basis(iso)
     units = _unit_info(iso, adm1)
     notes = [str(n) for n in (dict(cc.get('notes') or {}).get('site') or [])]
     if units['note']:
         notes.append(units['note'])
-    n_left = 7 - (not has_msb) - (not has_gar15)
-    count = {5: 'five', 6: 'six'}.get(n_left, str(n_left))
-    if not has_gar15:
+    n_left = 7 - (not has_msb) - (not has_gar15 and not gar_nat)
+    count = {5: 'five', 6: 'six', 7: 'seven'}.get(n_left, str(n_left))
+    if gar_nat:
+        notes.append("GAR15's per-country grid has no file for this "
+                     'country. Its national capital stock, from '
+                     "GAR15's country results, is shown as a country "
+                     'total only: no map, regional breakdown or '
+                     'urban/rural split.')
+    elif not has_gar15:
         notes.append("GAR15's per-country release has no file for this "
                      f'country, so {count} models are compared here '
                      'instead of seven.')
@@ -432,12 +459,16 @@ def build(iso='MAR'):
     if basis['basis'] != 'produced_capital':
         notes.append('The WB Wealth Accounts publish no produced-capital '
                      'series for this country; the vintage adjustment grows '
-                     f"values along {basis['short'].split(' (')[0]} instead.")
+                     f"values along {basis['short'].split(' (')[0]} instead"
+                     + (' (its real GDP fell over the last decade, which '
+                        'says little about a building stock that stayed '
+                        'standing).' if basis['basis'] == 'built_volume'
+                        else '.'))
     if not gem_split:
         notes.append('GEM v2026 publishes no urban/rural split for this '
                      'country.')
     vint = {m: y for m, y in deflate.VINTAGE_YEARS.items()
-            if m != 'gar15' or has_gar15}
+            if m != 'gar15' or has_gar15 or gar_nat}
     meta = {
         'iso': iso,
         'name': cc['name'],
@@ -472,7 +503,8 @@ def build(iso='MAR'):
         'sensitivity': _sensitivity(
             wide, rate, deflate.factor(deflate.VALUE_YEARS['ucc']), has_msb),
         'models': _models(iso, cov, has_msb, gem_split,
-                          buildings.overture_release(iso), has_gar15),
+                          buildings.overture_release(iso), has_gar15,
+                          gar_nat),
         'totals': totals,
     }
     with open(os.path.join(out_dir, 'meta.json'), 'w', encoding='utf-8') as f:
