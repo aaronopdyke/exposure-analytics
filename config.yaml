@@ -18,10 +18,19 @@ data_root: null            # null -> auto-detect (env DATA_ROOT / Colab / G:)
 #   label           long label for meta.json (defaults to name)
 #   gem2023_path    folder of the GEM v2023.1.1 per-country summary
 #   msb_regions     Microsoft GlobalML "Location" names ([] = no coverage)
+#   gar15           false where UNISDR's per-country GAR15 release has no
+#                   file for the country (the model is then left out)
 #   gem_name_aliases GEM region name -> display-unit name, where they differ
 #                   (only for countries matched by NAME; MAR has a curated
 #                   code crosswalk in src/gem.py)
+#   unit_names      WB Admin-1 name -> display name, where the WB layer
+#                   carries an outdated or unaccented name
 #   units           set when the WB Admin-1 layer has no usable subdivisions
+#   grade           exposure base of a World Bank GRADE for the country, as
+#                   reported (buildings AND contents, US$ of price_year) -
+#                   drawn against the models on the deck's GRADE slide
+#   benchmarks      other published exposure values to draw on that slide,
+#                   by display unit (used where there is no GRADE)
 # -------------------------------------------------------------------------
 countries:
   MAR:
@@ -29,6 +38,12 @@ countries:
     label: "Morocco (Western Sahara shown as one separate unit)"
     gem2023_path: "Africa/Morocco"
     msb_regions: ["Morocco"]
+    grade:
+      event: "2023 Al Haouz earthquake"
+      price_year: 2023          # US$ of the report year
+      stock_year: 2023
+      residential_usd: 277.0e+9      # buildings and contents
+      non_residential_usd: 201.0e+9  # buildings and contents
     notes:
       gem: "GEM regions matched to WB Admin-1 boundaries; GEM's two southern regions are assigned to the WB Western Sahara unit"
       site:
@@ -39,14 +54,38 @@ countries:
     name: "Colombia"
     gem2023_path: "South_America/Colombia"
     msb_regions: ["Colombia"]
+    grade:
+      event: "2026 earthquake"
+      price_year: 2026          # US$ of the report year
+      stock_year: 2026
+      residential_usd: 658.0e+9      # buildings and contents
+      non_residential_usd: 344.0e+9  # buildings and contents
     gem_name_aliases:
       "Distrito Capital de Bogotá": "Bogotá, D.C."
       "Bogota": "Bogotá, D.C."
       "San Andrés y Providencia": "Archipiélago de San Andrés, Providencia y Santa Catalina"
+    # deck maps: zoom to the mainland and draw these units in an inset box
+    # (the archipelago's outlying cays reach 15.8N and would otherwise
+    # shrink the whole map)
+    map_insets:
+      - units: ["COL004"]
+        label: "San Andrés y\nProvidencia"
   MHL:
     name: "Marshall Islands"
     gem2023_path: "Oceania/Marshall_Islands"
     msb_regions: []          # no Microsoft GlobalML tiles over the country
+    benchmarks:
+      # World Bank Spotlight (2026), "Mapping Risk, Building Resilience -
+      # Exposure Analysis of Pacific Urban Areas", Figure 15: value of the
+      # building stock per city (buildings only, 2024 stock, 2025 US$).
+      # Read off the chart bars, so good to about +/- $0.1 billion. The
+      # study is city-based; `unit` is the atoll each city sits on.
+      - source: "Pacific Spotlight (2026)"
+        price_year: 2025
+        note: "Pacific Spotlight: World Bank (2026), Mapping Risk, Building Resilience - Exposure Analysis of Pacific Urban Areas, Figure 15 (buildings only, 2024 stock, 2025 US$). Values read off the chart, to about ±$0.1 billion."
+        places:
+          - {name: "Majuro", unit: "Majuro", usd: 2.6e+9}
+          - {name: "Ebeye", unit: "Kwajalein", usd: 0.8e+9}
     gem_name_aliases:
       "Enewetak & Ujelang": "Enewetak"
       "Enewatak": "Enewetak"
@@ -62,6 +101,34 @@ countries:
       hdx_id: "cod-ab-mhl"
       hull_buffer_deg: 0.04
       rename: {"Eneu": "Bikini"}
+
+  VEN:
+    name: "Venezuela"
+    gem2023_path: "South_America/Venezuela"
+    msb_regions: ["Venezuela"]
+    # GAR15's per-country release (HDX, mirrored by Stanford) has no
+    # Venezuela file, and the original UNISDR/GRID download hosts are
+    # offline - six models are compared here.
+    gar15: false
+    unit_names:
+      "Vargas": "La Guaira"          # renamed in 2019
+      "Anzoategui": "Anzoátegui"
+      "Bolivar": "Bolívar"
+      "Falcon": "Falcón"
+      "Guarico": "Guárico"
+      "Merida": "Mérida"
+      "Tachira": "Táchira"
+    gem_name_aliases:
+      "Vargas": "La Guaira"          # GEM v2023.1.1 keeps the old name
+    grade:
+      # World Bank (2026), GRADE Report - Venezuela Earthquakes, June 24,
+      # 2026 (report as of July 13, 2026), Table 2: nationwide exposure.
+      event: "June 2026 earthquakes"
+      price_year: 2026          # US$ of the report year
+      stock_year: 2026
+      residential_usd: 667.26e+9      # buildings and contents
+      non_residential_usd: 264.71e+9  # buildings and contents
+      infrastructure_usd: 473.98e+9   # not compared (models are buildings only)
 
 boundaries:
   # WB Official Boundaries stop Morocco at 27.67N; Western Sahara exists only

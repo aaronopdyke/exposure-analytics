@@ -1,10 +1,11 @@
 """Publish the site HTML behind a landing page (open by default).
 
 Default (no flags): docs/index.html becomes the branded landing page with the
-country selection - one link per country that has built data
-(docs/data/countries.json), each a plain navigation to explorer.html?c=ISO3
-(no password, no crypto); every other page is copied to docs/ with its nav
-links repointed at explorer.html.
+country selection - a dropdown of every country that has built data
+(docs/data/countries.json) on a plain GET form, so choosing one navigates to
+explorer.html?c=ISO3 (no password, no crypto, works without JavaScript);
+every other page is copied to docs/ with its nav links repointed at
+explorer.html.
 
 Optional legacy modes:
   py site/tools/protect.py --password X   # AES-256-GCM password gate on all
@@ -207,21 +208,29 @@ document.getElementById("f").addEventListener("submit", async ev => {
 """
 
 
-_OPEN_FORM = """  <p class="pick" id="pick-label">Choose a country</p>
-  <nav class="countries" aria-labelledby="pick-label">
+_OPEN_FORM = """  <form class="pick-form" action="explorer.html" method="get">
+    <label class="pick" for="country">Choose a country</label>
+    <select id="country" name="c" required autofocus>
+      <option value="" disabled selected>Select a country&hellip;</option>
 __COUNTRIES__
-  </nav>"""
+    </select>
+    <button type="submit">Open the explorer</button>
+  </form>
+  <p class="count">__COUNT__ countries available</p>"""
 
-_OPEN_CSS = """  .pick { font-size:0.72rem; letter-spacing:0.14em; text-transform:uppercase;
-          color:#8fd6f2; margin:0 0 0.55rem; }
-  .countries { display:grid; gap:0.55rem; }
-  .countries a { display:flex; justify-content:space-between;
-          align-items:center; padding:0.6rem 0.85rem; border-radius:8px;
-          text-decoration:none; font-weight:600; color:#06263f;
-          background:linear-gradient(90deg,#0BD0D9,#009DD9); }
-  .countries a:hover, .countries a:focus-visible { filter:brightness(1.08); }
-  .countries a:focus-visible { outline:2px solid #fff; outline-offset:2px; }
-  .countries a span { font-weight:400; opacity:0.75; }
+_OPEN_CSS = """  .pick { display:block; font-size:0.72rem; letter-spacing:0.14em;
+          text-transform:uppercase; color:#8fd6f2; margin:0 0 0.55rem; }
+  select { width:100%; font:inherit; padding:0.6rem 2.2rem 0.6rem 0.75rem;
+          border-radius:8px; border:1px solid rgba(159,198,232,0.35);
+          background-color:rgba(6,20,40,0.6); color:#fff; cursor:pointer;
+          margin-bottom:0.75rem; appearance:none; -webkit-appearance:none;
+          background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%238fd6f2' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+          background-repeat:no-repeat; background-position:right 0.8rem center;
+          background-size:0.75rem; }
+  select:focus { outline:2px solid var(--bright); border-color:transparent; }
+  select:invalid { color:#9fbdd8; }
+  option { color:#fff; background:#0b1f3a; }
+  .count { margin:0.8rem 0 0; font-size:0.78rem; color:#9fbdd8; }
 </style>"""
 
 _GATED_FORM = """  <form id="f">
@@ -249,15 +258,19 @@ def built_countries():
 
 
 def landing_page(dst):
-    """Landing page = the country selection. Each country is a plain link
-    to explorer.html?c=ISO3 - no content embedding, no document.write, and
-    no auto-skip (the picker has to stay reachable with the Back button)."""
-    links = '\n'.join(
-        f'    <a href="explorer.html?c={html.escape(c["iso"])}">'
-        f'{html.escape(c["name"])}<span aria-hidden="true">&rarr;</span></a>'
-        for c in built_countries())
+    """Landing page = the country selection: a dropdown on a plain GET form
+    whose submit navigates to explorer.html?c=ISO3 - no content embedding,
+    no document.write, and no auto-skip (the picker has to stay reachable
+    with the Back button). A dropdown, not one button per country, so the
+    page stays the same size however many countries are added."""
+    countries = built_countries()
+    options = '\n'.join(
+        f'      <option value="{html.escape(c["iso"])}">'
+        f'{html.escape(c["name"])}</option>' for c in countries)
     head = TEMPLATE.split('const SALT =')[0]
-    head = head.replace(_GATED_FORM, _OPEN_FORM.replace('__COUNTRIES__', links))
+    form = (_OPEN_FORM.replace('__COUNTRIES__', options)
+            .replace('__COUNT__', str(len(countries))))
+    head = head.replace(_GATED_FORM, form)
     head = head.replace('</style>', _OPEN_CSS, 1)
     with open(dst, 'w', encoding='utf-8') as f:
         f.write(head + _OPEN_JS)

@@ -105,6 +105,10 @@ def admin1(iso=None, include_esh=None):
         raise ValueError(f'no ADM1 rows for {iso}')
     g = _norm_names(g, 1).to_crs(DISPLAY_CRS)
     g['admin_name'] = g['NAME_1'].astype(str)
+    # config `unit_names`: WB name -> current / correctly accented name
+    names = dict(COUNTRIES.get(iso, {}).get('unit_names') or {})
+    if names:
+        g['admin_name'] = g['admin_name'].replace(names)
     if 'ADM1CD_c' not in g.columns:
         g['ADM1CD_c'] = [f'{iso}{i:03d}' for i in range(len(g))]
     out = g[['ISO_A3', 'ADM1CD_c', 'admin_name', 'geometry']]

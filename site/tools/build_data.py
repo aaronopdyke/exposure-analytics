@@ -12,7 +12,9 @@ runs its Overture / GBA / Microsoft extractions (minutes to an hour or
 more); afterwards they are read from the Drive cache.
 
 Seven models: GAR15, GIRI, GEM v2023.1.1, GEM v2026.0.0, Overture, GBA,
-Microsoft GlobalML (dropped where Microsoft publishes no tiles).
+Microsoft GlobalML. Two can be missing for a country and are then left
+out everywhere: Microsoft where it publishes no tiles, GAR15 where the
+per-country release has no file (config `gar15: false`).
 Countries are configured in config.yaml (`countries:`).
 
 Floor areas for Overture/Microsoft: reported num_floors/height where
@@ -101,7 +103,8 @@ def _attr_phrase(share):
     return f'populated for {share:.0%} of footprint area'
 
 
-def _models(iso, cov, has_msb, gem_split, overture_release):
+def _models(iso, cov, has_msb, gem_split, overture_release,
+            has_gar15=True):
     cc = country(iso)
     est = ('Replacement value ESTIMATED as floor area x GEM-derived unit '
            'construction cost per unit (2024 US$, excl. contents).')
@@ -179,6 +182,8 @@ def _models(iso, cov, has_msb, gem_split, overture_release):
                      'via the 3-tier storey divisor; missing heights = 1 '
                      f'storey. Calibrates the other footprint sources. {est}')},
     }
+    if not has_gar15:
+        del m['gar15']
     if has_msb:
         sparse = cov['msb']['sparse_units']
         partial = ('Coverage is PARTIAL - little or no data in '
@@ -334,13 +339,20 @@ def build(iso='MAR'):
     adm1 = admin1(iso)
     include_esh = (adm1['ADM1CD_c'] == 'ESH000').any()
     has_msb = bool(buildings.msb_regions(iso))
+    has_gar15 = cc.get('gar15', True) is not False
     footprint = [p for p in FOOTPRINT_MODELS if p != 'msb' or has_msb]
 
-    print('GAR15 ...')
-    g15 = gar15.load(iso, include_esh=include_esh)
-    wide = util.points_to_adm1(g15, adm1, GAR_COLS, nearest_max_deg=0.1)
-    print(f"  assigned {wide['gar15_usd'].sum() / g15['gar15_usd'].sum():.1%}"
-          ' of the country file')
+    if has_gar15:
+        print('GAR15 ...')
+        g15 = gar15.load(iso, include_esh=include_esh)
+        wide = util.points_to_adm1(g15, adm1, GAR_COLS,
+                                   nearest_max_deg=0.1)
+        print('  assigned '
+              f"{wide['gar15_usd'].sum() / g15['gar15_usd'].sum():.1%}"
+              ' of the country file')
+    else:
+        print('GAR15: no country file published - left out')
+        wide = adm1.copy()
 
     print('GIRI ...')
     cells = giri.load_cells(tuple(adm1.total_bounds))
@@ -407,10 +419,16 @@ def build(iso='MAR'):
     notes = [str(n) for n in (dict(cc.get('notes') or {}).get('site') or [])]
     if units['note']:
         notes.append(units['note'])
+    n_left = 7 - (not has_msb) - (not has_gar15)
+    count = {5: 'five', 6: 'six'}.get(n_left, str(n_left))
+    if not has_gar15:
+        notes.append("GAR15's per-country release has no file for this "
+                     f'country, so {count} models are compared here '
+                     'instead of seven.')
     if not has_msb:
         notes.append('Microsoft GlobalML Building Footprints publish no '
-                     'tiles over this country, so six models are compared '
-                     'here instead of seven.')
+                     f'tiles over this country, so {count} models are '
+                     'compared here instead of seven.')
     if basis['basis'] != 'produced_capital':
         notes.append('The WB Wealth Accounts publish no produced-capital '
                      'series for this country; the vintage adjustment grows '
@@ -418,6 +436,8 @@ def build(iso='MAR'):
     if not gem_split:
         notes.append('GEM v2026 publishes no urban/rural split for this '
                      'country.')
+    vint = {m: y for m, y in deflate.VINTAGE_YEARS.items()
+            if m != 'gar15' or has_gar15}
     meta = {
         'iso': iso,
         'name': cc['name'],
@@ -431,7 +451,7 @@ def build(iso='MAR'):
                      'adj_suffix': '_adj',
                      'models': deflate.model_factors()},
         'vintages': {
-            'years': deflate.VINTAGE_YEARS,
+            'years': vint,
             'value_growth': {
                 'source': basis['source'],
                 'basis': basis['basis'],
@@ -439,20 +459,20 @@ def build(iso='MAR'):
                 'trailing_cagr': round(deflate.capital_cagr(iso), 4),
                 'factors': {m: round(deflate.capital_growth_factor(
                     iso, y, deflate.target_year()), 3)
-                    for m, y in deflate.VINTAGE_YEARS.items()}},
+                    for m, y in vint.items()}},
             'floor_growth': {
                 'source': 'GHSL Built-up Volume 2010-2020',
                 'rate': round(deflate.builtv_growth_rate(iso), 4),
                 'factors': {m: round(deflate.floor_growth_factor(
                     iso, y, deflate.target_year()), 3)
-                    for m, y in deflate.VINTAGE_YEARS.items()}}},
+                    for m, y in vint.items()}}},
         'ucc': {'source': ('UCC-database (GEM-derived, 2024 US$), '
                            'ADM1 TOTAL occupancy'),
                 'per_adm1_usd_m2': {k: round(v, 1) for k, v in u.items()}},
         'sensitivity': _sensitivity(
             wide, rate, deflate.factor(deflate.VALUE_YEARS['ucc']), has_msb),
         'models': _models(iso, cov, has_msb, gem_split,
-                          buildings.overture_release(iso)),
+                          buildings.overture_release(iso), has_gar15),
         'totals': totals,
     }
     with open(os.path.join(out_dir, 'meta.json'), 'w', encoding='utf-8') as f:

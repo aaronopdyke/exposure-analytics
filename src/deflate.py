@@ -249,6 +249,20 @@ def factor(year):
     return s[target_year()] / s[int(year)]
 
 
+def price_factor(year):
+    """(multiplier, extrapolated) taking {year} US$ to latest-year US$.
+
+    Unlike `factor`, accepts a year AFTER the last published deflator (a
+    report priced in the current year): those are extrapolated at the
+    latest annual rate, and the flag says so."""
+    s = series()
+    last, year = target_year(), int(year)
+    if year <= last:
+        return factor(year), False
+    rate = s[last] / s[last - 1]
+    return rate ** (last - year), True
+
+
 def model_factors():
     """{model: {'year': base_year, 'factor': to-target multiplier}}."""
     return {m: {'year': y, 'factor': round(factor(y), 4)}

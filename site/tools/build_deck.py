@@ -12,8 +12,14 @@ comparative statement (which model is highest, whether growing to a common
 year widens or narrows the spread, where regions disagree) is computed from
 docs/data/<ISO>/meta.json + adm1.geojson at build time, so the narrative
 cannot drift from the data. Models a country lacks (e.g. Microsoft over the
-Marshall Islands) drop out of the slides. Only the short COUNTRY_NOTES below
-are hand-written.
+Marshall Islands, GAR15 over Venezuela) drop out of the slides. Only the
+short COUNTRY_NOTES below are hand-written.
+
+The closing slide links the comparison to GRADE (the World Bank's rapid
+post-disaster damage estimation): a country's GRADE exposure base, or other
+published values where there is none, comes from config.yaml
+(`countries.<ISO>.grade` / `.benchmarks`) and is put on the models' footing
+by src/grade.py.
 
 Usage: py site/tools/build_deck.py [ISO3 ...]
        -> site/<Country>_Exposure_Model_Comparison.pptx (+ Drive Outputs/)
@@ -261,6 +267,9 @@ def _card(slide, x, y, w, name, color, desc, h=1.28, muted=False):
 # ---- the deck --------------------------------------------------------------
 def build(iso, out=None):
     import geopandas as gpd
+    sys.path.insert(0, os.path.dirname(SITE))
+    from src import grade
+    from src.config import country
 
     iso = iso.upper()
     fig = os.path.join(SITE, 'figures', iso)
@@ -289,17 +298,25 @@ def build(iso, out=None):
     VG = meta['vintages']['value_growth']
     FG = meta['vintages']['floor_growth']
     gdp_basis = VG.get('basis') == 'real_gdp'
+    cagr = VG['trailing_cagr']
+    # a shrinking series (Venezuela's GDP) reads better as "down x%/yr"
+    rate_txt = (f'~{cagr:.1%}/yr recently' if cagr >= 0 else
+                f'down ~{-cagr:.1%}/yr over the past decade')
     value_path = (
-        f"real GDP (WDI NY.GDP.MKTP.KD, ~{VG['trailing_cagr']:.1%}/yr "
-        f'recently - the WB Wealth Accounts publish no produced capital for '
-        f'{CTY})' if gdp_basis else
-        f"the WB produced-capital path (CWON NW.PCA.TO, "
-        f"~{VG['trailing_cagr']:.1%}/yr recently)")
+        f'real GDP (WDI NY.GDP.MKTP.KD, {rate_txt} - the WB Wealth Accounts '
+        f'publish no produced capital for {CTY})' if gdp_basis else
+        f'the WB produced-capital path (CWON NW.PCA.TO, {rate_txt})')
+    # output can collapse while the buildings stay standing
+    weak_path = (' GDP is a weak guide to the building stock here: output '
+                 'fell far more than buildings did, so read the grown values '
+                 'as indicative.' if gdp_basis and cagr < 0 else '')
 
     native = {'GAR15': ('gar15_usd_adj', 'gar15'),
               'GIRI': ('giri_total_usd_adj', 'giri'),
               'GEM v2023': ('gem23_bldg_repl_usd_adj', 'gem2023'),
               'GEM v2026': ('gem26_bldg_repl_usd_adj', 'gem2026')}
+    native = {n: v for n, v in native.items() if v[1] in M}
+    has_gar = 'gar15' in M
     nat = {n: T[c] for n, (c, _) in native.items()}
     nat_grown = {n: T[c] * VG['factors'][k] for n, (c, k) in native.items()}
     ratio = max(nat.values()) / min(nat.values())
@@ -337,11 +354,19 @@ def build(iso, out=None):
         msb_card = ('Microsoft GlobalML — not available', MUTED,
                     f'no tiles published over {CTY}; {NUM_WORD[n_models]} '
                     'models are compared instead of seven', True)
+    if has_gar:
+        gar_card = ('GAR15 — Global Assessment Report 2015', BLUE,
+                    'UN Int. Strategy for Disaster Reduction (UNISDR); ~5 km '
+                    'point grid, ~2011 inputs; native urban/rural split',
+                    False)
+    else:
+        gar_card = ('GAR15 — not available', MUTED,
+                    f"UNISDR's per-country release has no file for {CTY}; "
+                    f'{NUM_WORD[n_models]} models are compared instead of '
+                    'seven', True)
     cols = [
         ('CAPITAL STOCK OF BUILDINGS', 'top-down, from WB produced capital', [
-            ('GAR15 — Global Assessment Report 2015', BLUE,
-             'UN Int. Strategy for Disaster Reduction (UNISDR); ~5 km point '
-             'grid, ~2011 inputs; native urban/rural split', False),
+            gar_card,
             ('GIRI — Global Infrastructure Resilience Index', NAVY,
              'Building Exposure Model, UNEP/GRID-Geneva (~2023); 5 km '
              'rasters, ~2020 inputs; res / non-res layers', False),
@@ -421,29 +446,38 @@ def build(iso, out=None):
         verdict = (f'leaves the native-value spread essentially unchanged '
                    f'(~{ratio_grown:.1f}×) - the disagreements are about '
                    'method, not vintage.')
+    old_n = next(iter(native))          # oldest data vintage present
+    old_k = native[old_n][1]
+    old_f = VG['factors'][old_k]
+    old_verb = ('rises to' if old_f > 1.005 else
+                'falls to' if old_f < 0.995 else 'stays at')
     text_block(s, 0.75, 5.95, 11.8, [
         ('Identical charts to the previous slide, but each model is grown '
          f'from its data vintage: values along {value_path}, floor areas at '
-         f"the GHSL built-up-volume rate (~{FG['rate']:.1%}/yr). GAR15 "
-         f"(2011 inputs, x{VG['factors']['gar15']:.2f}) rises to "
-         f"{B(nat_grown['GAR15'])}.", 12.5, False, GREY, 8),
+         f"the GHSL built-up-volume rate (~{FG['rate']:.1%}/yr). {old_n} "
+         f"({meta['vintages']['years'][old_k]} inputs, x{old_f:.2f}) "
+         f'{old_verb} {B(nat_grown[old_n])}.', 12.5, False, GREY, 8),
         (f'Growing every model to a common stock year {verdict} Factors of '
-         f'x1.00 mean the data already reflects {YR}.',
+         f'x1.00 mean the data already reflects {YR}.{weak_path}',
          12.5, False, GREY, 0),
     ])
 
     # ---- regional breakdown (all statements derived from the unit table) ---
     trio = [('GAR15', 'gar15_usd_adj'), ('GIRI', 'giri_total_usd_adj'),
             ('GEM v2026', 'gem26_bldg_repl_usd_adj')]
+    trio = [t for t in trio if t[1] in g.columns]
+    n_trio = len(trio)
+    all_n = 'both' if n_trio == 2 else f'all {NUM_WORD[n_trio]}'
     nm = g['name'].str.split(' (', regex=False).str[0]
     share = {lab: g[col] / g[col].sum() for lab, col in trio}
     tops = {lab: nm[sh.idxmax()] for lab, sh in share.items()}
-    order = nm[(sum(share.values()) / 3).sort_values(ascending=False).index]
+    order = nm[(sum(share.values()) / n_trio).sort_values(
+        ascending=False).index]
     order = list(order)
     lead = order[0]
     lead_i = nm[nm == lead].index[0]
     if len(set(tops.values())) == 1:
-        head = f'Same leading {noun} in all three models'
+        head = f'Same leading {noun} in {all_n} models'
         b1 = (f'{lead} leads in every model, followed by {order[1]} and '
               f'{order[2]}.')
     else:
@@ -455,7 +489,7 @@ def build(iso, out=None):
           + ' of the national total.')
     # relative disagreement, among units that matter (>= 1% in some model)
     mat = g[[c for _, c in trio]]
-    big = (sum(share.values()) / 3) >= 0.01
+    big = (sum(share.values()) / n_trio) >= 0.01
     spread = (mat.max(axis=1) / mat.min(axis=1).where(mat.min(axis=1) > 0))
     spread = spread[big].dropna().sort_values(ascending=False)
     worst = [f'{nm[i]} ({spread[i]:.1f}×)' for i in spread.index[:2]]
@@ -463,7 +497,7 @@ def build(iso, out=None):
              ('–  ' + b1, 12.5, False, GREY, 7),
              ('–  ' + b2, 12.5, False, GREY, 7)]
     if worst:
-        lines.append((f'–  Relative disagreement between the three is '
+        lines.append((f'–  Relative disagreement between them is '
                       f'largest in {join_names(worst)}.', 12.5, False, GREY,
                       7))
     shown = len(g) if len(g) <= 14 else 12
@@ -503,20 +537,21 @@ def build(iso, out=None):
 
     est_sub = f'ESTIMATED replacement value = floor area × GEM UCC, {USD}'
 
-    model_slide('GAR15 — UNISDR Global Exposure Dataset (2015)',
-        'map_gar15.png', B(T['gar15_usd_adj']),
-        f'capital stock of buildings, {USD}', [
-        f"{B(T['gar15_usd'])} in its native 2005 US$ (WB produced capital, "
-        'structures - no contents)',
-        f"urban {B(T['gar15_urban_usd_adj'])} · rural "
-        f"{B(T['gar15_rural_usd_adj'])} "
-        f"({pct(T['gar15_urban_usd'], T['gar15_rural_usd'])} urban, native "
-        'split)',
-        'top-down: national capital stock distributed on a ~5 km grid '
-        '(1 km at the coast) using population and GDP proxies',
-        'source: HDX per-country shapefiles'
-        + (f"; {notes['gar15']}" if notes.get('gar15') else ''),
-    ])
+    if has_gar:
+        model_slide('GAR15 — UNISDR Global Exposure Dataset (2015)',
+            'map_gar15.png', B(T['gar15_usd_adj']),
+            f'capital stock of buildings, {USD}', [
+            f"{B(T['gar15_usd'])} in its native 2005 US$ (WB produced capital, "
+            'structures - no contents)',
+            f"urban {B(T['gar15_urban_usd_adj'])} · rural "
+            f"{B(T['gar15_rural_usd_adj'])} "
+            f"({pct(T['gar15_urban_usd'], T['gar15_rural_usd'])} urban, native "
+            'split)',
+            'top-down: national capital stock distributed on a ~5 km grid '
+            '(1 km at the coast) using population and GDP proxies',
+            'source: HDX per-country shapefiles'
+            + (f"; {notes['gar15']}" if notes.get('gar15') else ''),
+        ])
     model_slide('GIRI — Building Exposure Model (~2023)',
         'map_giri.png', B(T['giri_total_usd_adj']),
         f'capital stock of buildings, {USD}', [
@@ -605,23 +640,30 @@ def build(iso, out=None):
     # ---- section 3: assumptions & sensitivity ------------------------------
     section_slide(prs, lay, 3, 'Assumptions & sensitivity')
 
-    gar_b, gar_g = nat['GAR15'], nat_grown['GAR15']
-    giri_b, giri_g = nat['GIRI'], nat_grown['GIRI']
-    gap_b = max(gar_b, giri_b) / min(gar_b, giri_b)
-    gap_g = max(gar_g, giri_g) / min(gar_g, giri_g)
-    if (gar_b < giri_b) != (gar_g < giri_g):
-        gar_story = (f'OVERSHOOTING GIRI ({B(giri_g)}) rather than '
-                     'converging: their building-share methods differ, not '
-                     'their vintage.')
-    elif gap_g > gap_b * 1.03:
-        gar_story = (f'moving FURTHER from GIRI ({B(giri_g)}; gap '
-                     f'{gap_b:.1f}× to {gap_g:.1f}×) rather than converging: '
-                     'their building-share methods differ, not their '
-                     'vintage.')
+    if has_gar:
+        gar_b, gar_g = nat['GAR15'], nat_grown['GAR15']
+        giri_b, giri_g = nat['GIRI'], nat_grown['GIRI']
+        gap_b = max(gar_b, giri_b) / min(gar_b, giri_b)
+        gap_g = max(gar_g, giri_g) / min(gar_g, giri_g)
+        if (gar_b < giri_b) != (gar_g < giri_g):
+            gar_story = (f'OVERSHOOTING GIRI ({B(giri_g)}) rather than '
+                         'converging: their building-share methods differ, '
+                         'not their vintage.')
+        elif gap_g > gap_b * 1.03:
+            gar_story = (f'moving FURTHER from GIRI ({B(giri_g)}; gap '
+                         f'{gap_b:.1f}× to {gap_g:.1f}×) rather than '
+                         'converging: their building-share methods differ, '
+                         'not their vintage.')
+        else:
+            gar_story = (f'closing only part of the gap to GIRI ({B(giri_g)}; '
+                         f'{gap_b:.1f}× to {gap_g:.1f}×): most of the '
+                         'difference is method, not vintage.')
+        age_line = (f'Growing GAR15 along that series to {YR} yields '
+                    f'{B(gar_g)} - {gar_story}')
     else:
-        gar_story = (f'closing only part of the gap to GIRI ({B(giri_g)}; '
-                     f'{gap_b:.1f}× to {gap_g:.1f}×): most of the difference '
-                     'is method, not vintage.')
+        age_line = (f'Growing every native-value model to {YR} takes the '
+                    f'spread between them from {ratio:.1f}× to '
+                    f'{ratio_grown:.1f}×: the gap is method, not vintage.')
     g23_g = nat_grown['GEM v2023']
     g26 = nat['GEM v2026']
     if abs(g23_g - g26) < 0.6 * abs(nat['GEM v2023'] - g26):
@@ -642,8 +684,7 @@ def build(iso, out=None):
     pic_fit(s, os.path.join(fig, 'vintage_growth.png'), 0.6, 1.45, 12.1, 4.35)
     text_block(s, 0.75, 5.95, 11.8, [
         (f'Growth rates are data-driven, not assumed: values follow {series}, '
-         'floor areas the GHSL built-up-volume rate. Growing GAR15 along '
-         f'that series to {YR} yields {B(gar_g)} - {gar_story}',
+         f'floor areas the GHSL built-up-volume rate. {age_line}',
          12.5, False, GREY, 8),
         ('(Floor areas grow far more slowly - GHSL built-up volume, ~'
          f"{FG['rate']:.1%}/yr - so age barely moves them.) {gem_story}",
@@ -690,7 +731,9 @@ def build(iso, out=None):
     ])
 
     # ---- urban / rural -------------------------------------------------------
-    ur = {'GAR15': (T['gar15_urban_usd_adj'], T['gar15_rural_usd_adj'])}
+    ur = {}
+    if has_gar:
+        ur['GAR15'] = (T['gar15_urban_usd_adj'], T['gar15_rural_usd_adj'])
     if gem_split:
         ur['GEM v2026'] = (T['gem26_res_urban_usd_adj'],
                            T['gem26_res_rural_usd_adj'])
@@ -700,11 +743,22 @@ def build(iso, out=None):
     us = {k: u / (u + r) for k, (u, r) in ur.items() if u + r > 0}
     lo_k, hi_k = min(us, key=us.get), max(us, key=us.get)
     agree = us[hi_k] - us[lo_k] <= 0.25
-    own = ('GAR15 and GEM v2026 publish their own urban/rural splits (GEM: '
-           'residential only — COM/IND have no settlement tag).'
-           if gem_split else
-           'GAR15 publishes its own urban/rural split; GEM publishes none '
-           f'for {CTY}.')
+    gem_res = '(residential only — COM/IND have no settlement tag)'
+    if has_gar and gem_split:
+        own = ('GAR15 and GEM v2026 publish their own urban/rural splits '
+               f'(GEM: {gem_res[1:]}.')
+    elif has_gar:
+        own = ('GAR15 publishes its own urban/rural split; GEM publishes '
+               f'none for {CTY}.')
+    elif gem_split:
+        own = f'GEM v2026 publishes its own urban/rural split {gem_res}.'
+    else:
+        own = f'No model publishes its own urban/rural split for {CTY}.'
+    grid_note = (
+        ('GAR15 applies its own urban mask to capital stock, while the '
+         if has_gar else 'The ')
+        + 'footprint sources share one DEGURBA grid - so differences among '
+        'them reflect which buildings each maps, not definitions.')
     s = content_slide(prs, lay, 'Urban vs rural: '
                       + ('models broadly agree, definitions differ' if agree
                          else 'shares differ widely, and so do definitions'))
@@ -715,11 +769,146 @@ def build(iso, out=None):
          "at each building's 1 km grid cell.", 12.5, False, GREY, 8),
         (f'Urban shares run from {us[lo_k]:.0%} ({lo_k}) to {us[hi_k]:.0%} '
          f'({hi_k}). '
-         + ('GAR15 applies its own urban mask to capital stock, while the '
-            'footprint sources share one DEGURBA grid - so differences '
-            'among them reflect which buildings each maps, not definitions.'
-            ), 12.5, False, GREY, 0),
+         + grid_note, 12.5, False, GREY, 0),
     ])
+
+    # ---- link to GRADE: what the spread means for a damage estimate ---------
+    # Short bullets, one idea each; the method detail sits in the footnote.
+    L = grade.link(iso, meta, g)
+    G = L['grade']
+    RV = grade.REVIEW
+    SMALL = RGBColor(0x66, 0x66, 0x66)
+    n_word = NUM_WORD[n_models]
+    lo_v, hi_v = L['models'][L['lo']], L['models'][L['hi']]
+    med_u = L['unit_spread_median']
+    within = (f', and by more within a single {noun} (median {med_u:.1f}×)'
+              if med_u and med_u > L['spread'] * 1.05 else '')
+    s = content_slide(prs, lay, 'What this means for GRADE: the exposure base')
+    pic_fit(s, os.path.join(fig, 'grade_link.png'), 0.35, 1.3, 6.9, 5.8)
+    if G:
+        dev = G['vs_median']
+        pos = ('near the middle of' if abs(dev) <= 0.10 else
+               'in the upper half of' if dev > 0 else 'in the lower half of')
+        if G['ex_contents'] > hi_v:
+            pos = 'above'
+        elif G['ex_contents'] < lo_v:
+            pos = 'below'
+        lines = [
+            (f"GRADE's exposure sits {pos} the {n_word} models",
+             15, True, NAVY, 3),
+            (f"{G['event']} GRADE: {B(G['native_total'])} of buildings and "
+             f"contents ({G['price_year']} US$)", 12.5, False, BLUE, 10),
+            (f"–  Like for like, GRADE's buildings are worth "
+             f"{B(G['ex_contents'])} ({USD}, contents removed). The models "
+             f"range from {B(lo_v)} ({L['lo']}) to {B(hi_v)} ({L['hi']}).",
+             12.5, False, GREY, 8),
+            (f"–  GRADE puts {G['nonres_share']:.0%} of building value in "
+             'non-residential buildings. GEM v2026 puts '
+             f"{L['nonres_share']['GEM v2026']:.0%} there and GIRI "
+             f"{L['nonres_share']['GIRI']:.0%}.", 12.5, False, GREY, 8),
+            ('–  Sector results are where past GRADEs and PDNAs differ most: '
+             f"residential damage averaged {RV['residential_vs_pdna']:.0%} "
+             "of the PDNA's, non-residential "
+             f"{RV['non_residential_vs_pdna']:.0%} ({RV['cite']}).",
+             12.5, False, GREY, 8),
+            ('–  Exposure feeds straight into damage: switching models '
+             f"changes a result by up to {L['spread']:.1f}× nationally"
+             f'{within}.', 12.5, False, GREY, 8),
+            ('–  For future GRADEs: check the exposure base against these '
+             'models, report the range, and document unit costs and '
+             'contents.', 12.5, False, GREY, 10),
+        ]
+        stock = ('' if G['stock_year'] == YR or G['stock_growth'] is None
+                 else
+                 f" Stock years are not aligned: GRADE's {G['stock_year']} "
+                 f"stock taken to {YR} would be {G['stock_growth']:+.0%}.")
+        lines.append((
+            f"GRADE values converted from {G['price_year']} to {YR} US$ "
+            f"with the US GDP deflator (×{G['factor']:.3f}"
+            + (f", {G['price_year']} extrapolated" if G['extrapolated']
+               else '')
+            + "). Contents removed with GEM's contents-to-building ratio "
+            f"({L['contents_ratio']:.0%}).{stock} Each source defines "
+            'non-residential differently.', 9.5, False, SMALL, 0))
+    else:
+        fv = sorted(L['floor_vs_gem'].values())
+        floor = (f'{fv[0]:.1f}–{fv[-1]:.1f}×' if len(fv) > 1
+                 else f'{fv[0]:.1f}×')
+        fp = [lab for lab, k in L['keys'].items() if k in grade.FOOTPRINT]
+        ot = [lab for lab in L['keys'] if lab not in fp]
+
+        def rng(pls, labs):
+            r = sorted(pl['ratio'][x] for pl in pls for x in labs)
+            return f'{r[0]:.0%}–{r[-1]:.0%}'
+
+        def benchmark_lines():
+            out, note = [], ''
+            for b in L['benchmarks']:
+                pls = b['places']
+                out.append((
+                    f"–  Benchmark: the {b['source']} values buildings in "
+                    + join_names(f"{pl['name']} at about {B(pl['usd'])}"
+                                 for pl in pls)
+                    + '. The footprint models reach '
+                    + join_names(f"{rng([pl], fp)} of that for {pl['name']}"
+                                 if i == 0 else
+                                 f"{rng([pl], fp)} for {pl['name']}"
+                                 for i, pl in enumerate(pls))
+                    + f'; the other models reach {rng(pls, ot)}. (City '
+                    f'against whole {noun}, so indicative.)',
+                    12.5, False, GREY, 8))
+                note = (country(iso).get('benchmarks') or [{}])[0].get(
+                    'note', '')
+            return out, note
+
+        bench, note = benchmark_lines()
+        sub = (f"The {n_word} models range from {B(lo_v)} ({L['lo']}) to "
+               f"{B(hi_v)} ({L['hi']}), a {L['spread']:.1f}× spread",
+               12.5, False, BLUE, 10)
+        if atolls:
+            # Pacific atoll context: where the stock sits, why global
+            # models struggle with islets, and the regional evidence
+            mcols = [c for k, _, c in grade.MODELS if k in M]
+            shares = g[mcols] / g[mcols].sum()
+            top2 = shares.mean(axis=1).nlargest(2).index
+            conc = shares.loc[top2].sum()
+            v20, v23 = RV['vanuatu_vs_pdna']
+            lines = [
+                ('Pacific atolls: footprint-based models pick up additional '
+                 'exposure', 15, True, NAVY, 3),
+                sub,
+                (f'–  Exposure is concentrated: {join_names(nm[top2])} hold '
+                 f'{conc.min():.0%}–{conc.max():.0%} of national building '
+                 'value across the models, so one event can reach most of '
+                 'it.', 12.5, False, GREY, 8),
+                ('–  Global grids fit atolls poorly: the 5 km cells of the '
+                 'top-down models are wider than the islets. Mapped '
+                 f'footprints show {floor} the floor area GEM assumes.',
+                 12.5, False, GREY, 8),
+            ] + bench + [
+                (f'–  Pacific precedent: GRADE came in at {v20:.0%} and '
+                 f"{v23:.0%} of PDNA damage for Vanuatu's 2020 and 2023 "
+                 f"cyclones ({RV['cite']}).", 12.5, False, GREY, 8),
+                ('–  For future Pacific GRADEs: build exposure from mapped '
+                 'footprints, check unit costs against local construction '
+                 'prices, and report the model range.', 12.5, False, GREY,
+                 10),
+            ]
+        else:
+            lines = [
+                ('The choice of exposure model would drive any damage '
+                 'estimate', 15, True, NAVY, 3),
+                sub,
+                (f'–  Mapped footprints show {floor} the floor area GEM '
+                 'assumes.', 12.5, False, GREY, 8),
+            ] + bench + [
+                ('–  For future GRADEs: build exposure from footprints, '
+                 'document unit costs and contents, and report the model '
+                 'range.', 12.5, False, GREY, 10),
+            ]
+        if note:
+            lines.append((note, 9.5, False, SMALL, 0))
+    text_block(s, 7.45, 1.45, 5.5, lines)
 
     # ---- order: move the kept disclaimer slide to the end -------------------
     ids = list(prs.slides._sldIdLst)

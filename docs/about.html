@@ -143,8 +143,8 @@ just data age. By default the site shows each model's own base-year values;
 switching to "grown" answers <em>"what would this dataset say about today's
 stock if its method were left unchanged?"</em>. If age were the explanation,
 the grown figures would converge. For <span data-v="name">this country</span>:
-GAR15 grown from its 2011 inputs is <strong data-v="gar_grown">…</strong>
-against GIRI grown from 2020 at <strong data-v="giri_grown">…</strong> and
+<span id="gar-clause">GAR15 grown from its 2011 inputs is <strong data-v="gar_grown">…</strong>
+against </span>GIRI grown from 2020 at <strong data-v="giri_grown">…</strong> and
 GEM v2026 at <strong data-v="gem26">…</strong> — the native-value spread goes
 from <span data-v="spread">…</span> at base year to
 <span data-v="spread_grown">…</span> after growing. In the countries built so
@@ -367,6 +367,7 @@ Accounts.</p>
                    gem2026: "gem26_bldg_repl_usd_adj" };
     var base = [], grown = [];
     Object.keys(native).forEach(function (k) {
+      if (!m.models[k]) return;          // a model this country lacks
       base.push(T[native[k]]);
       grown.push(T[native[k]] * VG.factors[k]);
     });
@@ -396,7 +397,8 @@ Accounts.</p>
       floor_rate: pct(FG.rate),
       value_basis: VG.short || "WB produced capital (CWON)",
       wedge: pct((1 + VG.trailing_cagr) / (1 + FG.rate) - 1),
-      gar_grown: usd(T.gar15_usd_adj * VG.factors.gar15),
+      gar_grown: m.models.gar15
+        ? usd(T.gar15_usd_adj * VG.factors.gar15) : null,
       giri_grown: usd(T.giri_total_usd_adj * VG.factors.giri),
       gem26: usd(T.gem26_bldg_repl_usd_adj),
       spread: ratio(base),
@@ -418,6 +420,10 @@ Accounts.</p>
       gem26_contents: usd(T.gem26_contents_usd),
       gem26_with_contents: usd(T.gem26_bldg_repl_usd + T.gem26_contents_usd)
     };
+    if (!m.models.gar15) {             // no GAR15 here: drop its clause
+      var gc = document.getElementById("gar-clause");
+      if (gc) gc.parentNode.removeChild(gc);
+    }
     document.querySelectorAll("[data-v]").forEach(function (el) {
       var k = el.getAttribute("data-v");
       if (v[k] != null) el.textContent = v[k];

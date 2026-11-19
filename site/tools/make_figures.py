@@ -26,9 +26,13 @@ from matplotlib.patches import Patch
 
 SITE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS_DATA = os.path.join(os.path.dirname(SITE), 'docs', 'data')
+sys.path.insert(0, os.path.dirname(SITE))
+from src.config import country                               # noqa: E402
+from src import grade                                        # noqa: E402
 
 NAVY, BLUE, BRIGHT, CYAN = '#17406D', '#0F6FC6', '#009DD9', '#0BD0D9'
 GREEN, OLIVE, TINT = '#10CF9B', '#A5C249', '#DBEFF9'
+ORANGE = '#E8762B'      # GRADE / outside benchmarks - not a model colour
 WBG_SEQ = LinearSegmentedColormap.from_list('wbg', [TINT, BRIGHT, BLUE, NAVY])
 
 plt.rcParams.update({'font.family': 'Arial', 'font.size': 11,
@@ -112,6 +116,13 @@ def make(iso, out=None):
     # fixed places (no tight-bbox crop, which re-centres the picture on
     # whatever the title's width happens to be) - so flipping between the
     # model slides the country stays put and only the colours change.
+    # Far-flung units named under `map_insets` in config.yaml are drawn in
+    # a small box instead, so the main map can zoom to everything else.
+    insets = list(country(iso).get('map_insets') or [])
+    inset_codes = {c for i in insets for c in i['units']}
+    main = g[~g['code'].isin(inset_codes)]
+    minx, miny, maxx, maxy = main.total_bounds
+    pad = 0.02 * max(maxx - minx, maxy - miny)
     for key, _, col, _, _ in models:
         fig = plt.figure(figsize=(7.2, 6.0))
         ax = fig.add_axes([0.01, 0.01, 0.80, 0.89])
@@ -126,7 +137,28 @@ def make(iso, out=None):
         if len(esh):
             esh.plot(ax=ax, facecolor='none', edgecolor='#8a8873',
                      hatch='///', linewidth=0.9)
+        ax.set_xlim(minx - pad, maxx + pad)
+        ax.set_ylim(miny - pad, maxy + pad)
         ax.set_axis_off()
+        for n, spec in enumerate(insets):
+            sub = g[g['code'].isin(spec['units'])]
+            # frame the islands that matter, not every outlying cay
+            parts = sub.explode(index_parts=False)
+            big = parts[parts.area >= 0.2 * parts.area.max()]
+            bx0, by0, bx1, by1 = big.total_bounds
+            m = 0.18 * max(bx1 - bx0, by1 - by0)
+            iax = fig.add_axes([0.085, 0.60 - n * 0.30, 0.10, 0.25])
+            sub.plot(column=col, ax=iax, cmap=WBG_SEQ, vmin=0, vmax=vmax,
+                     edgecolor='face', linewidth=1.6)
+            iax.set_xlim(bx0 - m, bx1 + m)
+            iax.set_ylim(by0 - m, by1 + m)
+            iax.set_xticks([])
+            iax.set_yticks([])
+            for sp in iax.spines.values():
+                sp.set_edgecolor('#9aa7b2')
+                sp.set_linewidth(0.8)
+            iax.set_title(str(spec.get('label', '')), fontsize=7.5,
+                          color='#555', pad=3)
         fig.text(0.41, 0.945, MAP_TITLES[key], ha='center', va='center',
                  fontsize=14, fontweight='bold', color=NAVY)
         fig.savefig(os.path.join(out, MAP_FILES[key]), dpi=200)
@@ -184,6 +216,7 @@ def make(iso, out=None):
     trio = [(0.25, 'gar15_usd_adj', BLUE, 'GAR15'),
             (0.0, 'giri_total_usd_adj', NAVY, 'GIRI'),
             (-0.25, 'gem26_bldg_repl_usd_adj', BRIGHT, 'GEM v2026')]
+    trio = [t for t in trio if t[1] in g.columns]   # GAR15 may be missing
     TOP = 12
     gg = g.assign(_peak=g[[t[1] for t in trio]].max(axis=1))
     shown = len(gg) if len(gg) <= TOP + 2 else TOP
@@ -210,8 +243,10 @@ def make(iso, out=None):
     save(fig, 'adm1_grouped.png')
 
     # ---- comparison: urban / rural ---------------------------------------
-    ur = [('GAR15 value\n(all sectors)', T['gar15_urban_usd_adj'],
-           T['gar15_rural_usd_adj'])]
+    ur = []
+    if 'gar15' in meta['models']:
+        ur.append(('GAR15 value\n(all sectors)', T['gar15_urban_usd_adj'],
+                   T['gar15_rural_usd_adj']))
     if 'urban' in meta['models']['gem2026']['value']:
         ur.append(('GEM v2026 res. value', T['gem26_res_urban_usd_adj'],
                    T['gem26_res_rural_usd_adj']))
@@ -266,8 +301,10 @@ def make(iso, out=None):
     ax.set_ylabel(f'{usdlab}, {gword}')
     top = max(adj) * 1.15
     ax.set_ylim(0, top / gdiv)
-    ax.set_title(f'Value: grown along {v_basis} (~{100 * v_cagr:.1f}%/yr '
-                 'recently)', fontweight='bold', color=NAVY, fontsize=10.5)
+    v_rate = (f'~{100 * v_cagr:.1f}%/yr recently' if v_cagr >= 0 else
+              f'down ~{-100 * v_cagr:.1f}%/yr over the past decade')
+    ax.set_title(f'Value: grown along {v_basis} ({v_rate})',
+                 fontweight='bold', color=NAVY, fontsize=10.5)
     for i, a in enumerate(adj):
         ax.text(i + 0.2, (a + 0.011 * top) / gdiv, gfmt(a), ha='center',
                 fontsize=8.5, fontweight='bold', color=NAVY)
@@ -330,6 +367,105 @@ def make(iso, out=None):
                 fontsize=8.5, color='#666')
         fig.tight_layout()
         save(fig, 'bars_sensitivity.png')
+
+    # ---- link to GRADE: the models against a GRADE exposure base ----------
+    # (or, where no GRADE exists, against other published values by unit).
+    # Bars are the same structures-only values as every other chart; the
+    # values sit in the tick labels so the reference lines never cross them.
+    L = grade.link(iso, meta, g)
+    colour = {k: c for k, _, _, _, c in MODELS}
+
+    def model_bars(ax, vals, title, refs=()):
+        """Horizontal model bars, deck order top-down; refs = [(value,
+        dashed, label)] drawn as orange reference lines, labelled in the
+        empty row above the bars."""
+        labs = list(vals)
+        n = len(labs)
+        top = max(list(vals.values()) + [r[0] for r in refs])
+        div, word, fmt = money_scale(top)
+        refs = sorted(refs)
+        # a single reference line is labelled on whichever side has room;
+        # only a label reading rightwards needs space beyond its line
+        lone_left = len(refs) == 1 and refs[0][0] > 0.6 * max(vals.values())
+        xmax = max(max(vals.values()) * 1.1,
+                   max([r[0] for r in refs] or [0])
+                   * (1.08 if lone_left else 1.42))
+        for i, lab in enumerate(labs):
+            k = L['keys'][lab]
+            ax.barh(n - 1 - i, vals[lab] / div, height=0.62, color=colour[k])
+        ax.set_yticks([n - 1 - i for i in range(n)],
+                      [f'{star(L["keys"][lab], lab)}  {fmt(vals[lab])}'
+                       for lab in labs], fontsize=9.5)
+        ax.set_ylim(-0.6, n + (0.95 if refs else -0.4))
+        ax.set_xlim(0, xmax / div)
+        for j, (v, dashed, text) in enumerate(refs):
+            ax.axvline(v / div, color=ORANGE, lw=2.2,
+                       ls=(0, (4, 2.5)) if dashed else '-', zorder=3)
+            # the lowest line's label reads leftwards, the others rightwards,
+            # so two labels never share space
+            left = (j == 0 and len(refs) > 1) or lone_left
+            ax.text((v - 0.012 * xmax * (1 if left else -1)) / div, n + 0.42,
+                    text.replace('{v}', fmt(v)), ha='right' if left else
+                    'left', va='center', fontsize=8.5, color=ORANGE,
+                    fontweight='bold', linespacing=1.15)
+        ax.set_xlabel(f'{usdlab}, {word}', fontsize=9.5)
+        ax.tick_params(axis='x', labelsize=9)
+        ax.spines[['top', 'right']].set_visible(False)
+        ax.set_title(title, fontweight='bold', color=NAVY, fontsize=11,
+                     loc='left')
+
+    G = L['grade']
+    if G:
+        fig = plt.figure(figsize=(7.4, 6.2))
+        gs = fig.add_gridspec(2, 1, height_ratios=[3.1, 1.0], hspace=0.52,
+                              left=0.215, right=0.97, top=0.94, bottom=0.115)
+        ax = fig.add_subplot(gs[0])
+        model_bars(ax, L['models'],
+                   'Building value: the models (structures only) and GRADE',
+                   refs=[(G['total'], False,
+                          'GRADE as reported\n{v} incl. contents'),
+                         (G['ex_contents'], True,
+                          'GRADE less contents\n{v} '
+                          f"(GEM's {L['contents_ratio']:.0%})")])
+        ax2 = fig.add_subplot(gs[1])
+        sh = [('GRADE', G['nonres_share'], ORANGE),
+              ('GEM v2026', L['nonres_share']['GEM v2026'], BRIGHT),
+              ('GIRI', L['nonres_share']['GIRI'], NAVY)]
+        for i, (lab, v, c) in enumerate(sh):
+            ax2.barh(len(sh) - 1 - i, 100 * v, height=0.62, color=c)
+            ax2.text(100 * v + 1.5, len(sh) - 1 - i, f'{v:.0%}', va='center',
+                     fontweight='bold', color=NAVY, fontsize=9.5)
+        ax2.set_yticks([len(sh) - 1 - i for i in range(len(sh))],
+                       [x[0] for x in sh], fontsize=9.5)
+        ax2.set_xlim(0, 100)
+        ax2.set_ylim(-0.6, len(sh) - 0.4)
+        ax2.set_xlabel('% of each source\'s building value', fontsize=9.5)
+        ax2.tick_params(axis='x', labelsize=9)
+        ax2.spines[['top', 'right']].set_visible(False)
+        ax2.set_title('Non-residential share of building value',
+                      fontweight='bold', color=NAVY, fontsize=11, loc='left')
+    elif L['benchmarks']:
+        b = L['benchmarks'][0]
+        places = b['places']
+        fig = plt.figure(figsize=(7.4, 6.2))
+        gs = fig.add_gridspec(len(places), 1, hspace=0.6, left=0.215,
+                              right=0.97, top=0.94, bottom=0.115)
+        for i, pl in enumerate(places):
+            what = (f"{pl['unit']} atoll" if atolls else pl['unit'])
+            city = ('' if pl['name'] == pl['unit']
+                    else f" (benchmark city: {pl['name']})")
+            model_bars(fig.add_subplot(gs[i]), pl['models'],
+                       f'{what}{city}: building value, structures only',
+                       refs=[(pl['usd'], False,
+                              f"{b['source']}\n≈{{v}}, {pl['name']}")])
+    else:
+        fig = plt.figure(figsize=(7.4, 6.2))
+        ax = fig.add_axes([0.215, 0.115, 0.755, 0.825])
+        model_bars(ax, L['models'], 'Building value by model (structures only)')
+    fig.text(0.215, 0.014, EST_NOTE, ha='left', fontsize=8.5, color='#666')
+    # fixed canvas (no tight crop): the slide places this at a known size
+    fig.savefig(os.path.join(out, 'grade_link.png'), dpi=200)
+    plt.close(fig)
 
     print('figures written to', out)
 

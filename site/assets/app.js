@@ -559,9 +559,12 @@
         ? ("Each model grown from its data vintage to " + usdYear() +
            (S.metric === "value"
              ? " along " + (META.vintages.value_growth.short ||
-                 "WB produced capital (CWON)") + " (~" +
-               (100 * META.vintages.value_growth.trailing_cagr).toFixed(1) +
-               "%/yr recently)."
+                 "WB produced capital (CWON)") + " (" +
+               (META.vintages.value_growth.trailing_cagr >= 0
+                 ? "~" + (100 * META.vintages.value_growth.trailing_cagr)
+                     .toFixed(1) + "%/yr recently"
+                 : "down ~" + (-100 * META.vintages.value_growth.trailing_cagr)
+                     .toFixed(1) + "%/yr over the past decade") + ")."
              : " at the GHSL built-up-volume rate (~" +
                (100 * META.vintages.floor_growth.rate).toFixed(1) + "%/yr).") +
            " Use it to test how much of a gap is just data age.")

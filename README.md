@@ -9,8 +9,9 @@ see *how much* they disagree, *why*, and *which differences actually matter*
 for your use case.
 
 **Live site:** https://aaronopdyke.github.io/exposure-analytics/
-· countries: **Colombia**, **Marshall Islands**, **Morocco** — pick one on
-the landing page, or switch from the header of any page.
+· countries: **Colombia**, **Marshall Islands**, **Morocco**, **Venezuela**
+— pick one from the dropdown on the landing page, or switch from the header
+of any page.
 
 ## What you can do with it
 
@@ -85,10 +86,10 @@ site only.
 
 ```
 pip install -r requirements.txt
-py site/tools/build_data.py MAR COL MHL     # per-country data (extractions cached)
-py site/tools/protect.py                    # landing page (country picker) + pages into docs/
-py site/tools/make_figures.py MAR COL MHL   # deck figures -> site/figures/<ISO>/
-py site/tools/build_deck.py MAR COL MHL     # one WBG PowerPoint per country
+py site/tools/build_data.py MAR COL MHL VEN     # per-country data (extractions cached)
+py site/tools/protect.py                        # landing page (country dropdown) + pages into docs/
+py site/tools/make_figures.py MAR COL MHL VEN   # deck figures -> site/figures/<ISO>/
+py site/tools/build_deck.py MAR COL MHL VEN     # one WBG PowerPoint per country
 ```
 
 First-time extractions (Overture S3 scan, GBA tiles, Microsoft quadkeys) take
@@ -99,7 +100,9 @@ cached on the Drive.
 
 1. Add it under `countries:` in `config.yaml` — display name, the GEM
    v2023.1.1 folder, Microsoft's region name (or `[]` if Microsoft has no
-   tiles there).
+   tiles there). Set `gar15: false` if GAR15's per-country release has no
+   file for it (Venezuela), and `unit_names` where the WB layer carries an
+   outdated or unaccented unit name.
 2. Run `build_data.py <ISO>`. GEM regions are matched to the WB units by
    name; if the build stops on an unmatched region, add it to
    `gem_name_aliases`.
@@ -109,11 +112,21 @@ cached on the Drive.
    `site/deck/cover_<ISO>.png` when it exists and a neutral skyline
    otherwise; add a scene to `site/tools/make_covers.py` to draw one in
    the shared style.
+5. Optional: link the deck to GRADE. The closing slide draws a GRADE
+   exposure base (`grade:` under the country in `config.yaml` — as
+   reported, buildings and contents, with its price year) against the
+   models, converted to the same price year. Without one it compares
+   other published values by unit (`benchmarks:`), or just shows the
+   spread a GRADE would start from.
 
 Two situations need more than configuration: a territory WB carries
 separately (Morocco / Western Sahara, curated in `src/gem.py` and
 `src/boundaries.py`), and a country WB carries as a single Admin-1 unit
 (Marshall Islands — set `units:` to split the WB coastline into atolls).
+
+A model a country lacks is left out everywhere — site, figures and deck —
+and the country is compared on the models that remain: no Microsoft tiles
+over the Marshall Islands, no GAR15 country file for Venezuela.
 
 ## License
 

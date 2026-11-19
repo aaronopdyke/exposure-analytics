@@ -5,7 +5,7 @@ navy building silhouettes with cyan openings, and dashed "detected
 footprint" boxes around a few buildings.
 
     py site/tools/make_covers.py            # every scene defined below
-    py site/tools/make_covers.py COL MHL
+    py site/tools/make_covers.py COL MHL VEN
 
 Writes site/deck/cover_<ISO>.png (3440x1936). build_deck.py uses
 cover_<ISO>.png when it exists and cover_default.png otherwise. Morocco's
@@ -365,6 +365,93 @@ def marshall_islands():
     return c
 
 
+def venezuela():
+    """Caracas under the Avila: one long mountain wall with a cable car up
+    to a round hilltop tower, twin modernist towers, a long slab apartment
+    block, self-built houses stepping up a hillside, and palms."""
+    c = Canvas()
+    c.moon(455, 190, 76)
+    # the Avila: a single long wall behind the valley
+    c.ridge([(0, 540), (140, 486), (300, 440), (460, 392), (600, 356),
+             (760, 330), (900, 298), (1010, 280), (1120, 300), (1260, 344),
+             (1400, 334), (1560, 384), (1720, 426), (1880, 474), (2000, 506)],
+            RIDGE_FAR)
+    c.ridge([(0, 720), (200, 668), (420, 706), (640, 646), (860, 694),
+             (1100, 652), (1340, 704), (1600, 664), (1820, 712), (2000, 682)],
+            RIDGE_NEAR)
+    # round tower and station on the summit, cable car up from the valley
+    hill = mix(RIDGE_FAR, NAVY, 0.55)
+    c.rect(962, 266, 1058, 284, hill)                    # station
+    c.rect(992, 226, 1028, 270, hill)                    # round tower
+    c.dome(1010, 227, 18, 10, hill)
+    x0, y0, x1, y1 = 596, 640, 964, 270
+    c.poly([(x0, y0), (x1, y1), (x1, y1 + 2.4), (x0, y0 + 2.4)], hill)
+    for t in (0.3, 0.62):                                # pylons
+        px, py = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
+        c.rect(px - 2.5, py - 4, px + 2.5, py + 34, hill)
+    for t in (0.16, 0.47, 0.8):                          # cabins
+        px, py = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
+        c.rect(px - 1, py, px + 1, py + 8, hill)
+        c.rect(px - 8, py + 8, px + 8, py + 21, hill)
+
+    # self-built houses stepping up a hillside
+    rnd = random.Random(11)
+    x = -30
+    while x < 486:
+        w = rnd.choice((44, 52, 60))
+        top = 770 + max(x, 0) * 0.42 - rnd.choice((0, 16, 34))
+        c.rect(x, top, x + w + 1, H)
+        if rnd.random() < 0.35:                          # rooftop tank
+            c.rect(x + 10, top - 12, x + 26, top)
+        y = top + 16
+        while y < H - 30:
+            if rnd.random() < 0.72:
+                wx = x + rnd.choice((8, 14, w - 26))
+                c.rect(wx, y, wx + 15, y + 20, CYAN)
+            y += rnd.choice((46, 54, 62))
+        x += w
+    c.dashed_box(196, 756, 372, 936)
+    # long slab apartment block with stair towers
+    c.rect(510, 716, 772, H)
+    c.rect(510, 692, 548, 716)
+    c.rect(734, 692, 772, 716)
+    c.windows(530, 744, 8, 5, 15, 24, 14, 36)
+    c.dashed_box(494, 672, 788, 900)
+    # palms and low infill
+    c.rect(772, 968, 890, H)
+    c.coconut_palm(808, H, 470, lean=10, size=0.92)
+    c.coconut_palm(858, H, 360, lean=-14, size=0.8)
+    # twin modernist towers
+    for tx in (896, 1000):
+        c.rect(tx, 424, tx + 84, H)
+        c.rect(tx + 12, 406, tx + 72, 424)               # crown
+        c.rect(tx + 24, 392, tx + 60, 406)
+        for band in range(5):
+            for i in range(3):
+                wx = tx + 14 + i * 24
+                c.rect(wx, 462 + band * 132, wx + 9,
+                       462 + band * 132 + 96, CYAN)
+    c.dashed_box(880, 372, 1100, 610)
+    # stepped mid-rise and a second slab
+    c.rect(1112, 770, 1246, H)
+    c.rect(1140, 728, 1218, 770)
+    c.windows(1128, 800, 2, 3, 30, 44, 28, 46)
+    c.rect(1262, 838, 1436, H)
+    c.rect(1262, 820, 1294, 838)
+    c.windows(1280, 866, 5, 3, 16, 26, 16, 40)
+    c.dashed_box(1248, 800, 1450, 990)
+    # right-hand blocks (mostly cropped on the slide)
+    c.rect(1452, 640, 1560, H)
+    c.windows(1470, 676, 2, 5, 26, 40, 24, 46)
+    c.rect(1575, 880, 1730, H)
+    c.windows(1596, 908, 3, 2, 26, 40, 24, 44)
+    c.rect(1745, 730, 1860, H)
+    c.windows(1764, 762, 2, 4, 28, 42, 24, 46)
+    c.rect(1875, 900, 2020, H)
+    c.windows(1896, 930, 2, 2, 28, 40, 30, 44)
+    return c
+
+
 def default():
     """Neutral mid-rise skyline for countries without their own scene."""
     c = Canvas()
@@ -392,7 +479,8 @@ def default():
     return c
 
 
-SCENES = {'COL': colombia, 'MHL': marshall_islands, 'default': default}
+SCENES = {'COL': colombia, 'MHL': marshall_islands, 'VEN': venezuela,
+          'default': default}
 
 
 if __name__ == '__main__':

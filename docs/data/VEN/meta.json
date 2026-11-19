@@ -1,0 +1,577 @@
+{
+ "iso": "VEN",
+ "name": "Venezuela",
+ "country": "Venezuela",
+ "units": {
+  "kind": "adm1",
+  "count": 25,
+  "noun": "region",
+  "label": "WB Admin-1 units",
+  "note": null
+ },
+ "notes": [
+  "GAR15's per-country release has no file for this country, so six models are compared here instead of seven.",
+  "The WB Wealth Accounts publish no produced-capital series for this country; the vintage adjustment grows values along real GDP instead."
+ ],
+ "coverage": {
+  "overture": {
+   "attr_share": 0.0275
+  },
+  "msb": {
+   "attr_share": 0.0,
+   "sparse_units": [],
+   "vs_gba_buildings": 0.538,
+   "vs_gba_footprint": 0.824
+  },
+  "gba": {
+   "missing_height_share": 0.08
+  }
+ },
+ "generated": "2026-11-19",
+ "deflator": {
+  "target_year": 2025,
+  "source": "WDI NY.GDP.DEFL.ZS (USA)",
+  "adj_suffix": "_adj",
+  "models": {
+   "gar15": {
+    "year": 2005,
+    "factor": 1.581
+   },
+   "giri": {
+    "year": 2018,
+    "factor": 1.2605
+   },
+   "gem2023": {
+    "year": 2021,
+    "factor": 1.1702
+   },
+   "gem2026": {
+    "year": 2024,
+    "factor": 1.028
+   },
+   "ucc": {
+    "year": 2024,
+    "factor": 1.028
+   }
+  }
+ },
+ "vintages": {
+  "years": {
+   "giri": 2020,
+   "gem2023": 2023,
+   "gem2026": 2025,
+   "overture": 2025,
+   "gba": 2023,
+   "msb": 2024
+  },
+  "value_growth": {
+   "source": "WDI real GDP (NY.GDP.MKTP.KD, constant 2015 US$) - the WB Wealth Accounts publish no produced capital for this country, so GDP stands in for the capital path",
+   "basis": "real_gdp",
+   "short": "real GDP (WDI; no produced-capital series published)",
+   "trailing_cagr": -0.1007,
+   "factors": {
+    "giri": 1.212,
+    "gem2023": 1.072,
+    "gem2026": 1.0,
+    "overture": 1.0,
+    "gba": 1.072,
+    "msb": 1.016
+   }
+  },
+  "floor_growth": {
+   "source": "GHSL Built-up Volume 2010-2020",
+   "rate": 0.0086,
+   "factors": {
+    "giri": 1.044,
+    "gem2023": 1.017,
+    "gem2026": 1.0,
+    "overture": 1.0,
+    "gba": 1.017,
+    "msb": 1.009
+   }
+  }
+ },
+ "ucc": {
+  "source": "UCC-database (GEM-derived, 2024 US$), ADM1 TOTAL occupancy",
+  "per_adm1_usd_m2": {
+   "VEN002": 315.1,
+   "VEN004": 327.7,
+   "VEN006": 316.9,
+   "VEN009": 266.7,
+   "VEN010": 160.3,
+   "VEN013": 303.0,
+   "VEN016": 320.3,
+   "VEN017": 313.2,
+   "VEN018": 327.4,
+   "VEN020": 303.7,
+   "VEN003": 278.1,
+   "VEN005": 292.6,
+   "VEN007": 325.8,
+   "VEN008": 306.0,
+   "VEN011": 340.4,
+   "VEN012": 280.7,
+   "VEN014": 298.5,
+   "VEN015": 320.1,
+   "VEN019": 298.5,
+   "VEN021": 312.9,
+   "VEN022": 309.9,
+   "VEN023": 310.6,
+   "VEN024": 299.8,
+   "VEN025": 317.8,
+   "VEN001": 371.6
+  }
+ },
+ "sensitivity": {
+  "baseline": {
+   "label": "continuous h / divisor (published)",
+   "models": {
+    "gba": {
+     "floor_m2": 1971025296.8135388,
+     "value_usd_adj": 635231091705.72
+    },
+    "overture": {
+     "floor_m2": 1786101807.4235024,
+     "value_usd_adj": 575999237091.9271
+    },
+    "msb": {
+     "floor_m2": 1627763040.589629,
+     "value_usd_adj": 525143903334.7936
+    }
+   }
+  },
+  "floor": {
+   "label": "integer storeys, rounded down (min 1)",
+   "models": {
+    "gba": {
+     "floor_m2": 1652962425.5520957,
+     "value_usd_adj": 532421335089.2467
+    },
+    "overture": {
+     "floor_m2": 1511400692.120042,
+     "value_usd_adj": 487271438430.18207
+    },
+    "msb": {
+     "floor_m2": 1365314312.4881372,
+     "value_usd_adj": 440210384966.47986
+    }
+   }
+  },
+  "ceil": {
+   "label": "integer storeys, rounded up",
+   "models": {
+    "gba": {
+     "floor_m2": 2585209211.574177,
+     "value_usd_adj": 832238525017.3683
+    },
+    "overture": {
+     "floor_m2": 2318790060.5365243,
+     "value_usd_adj": 746734703751.6376
+    },
+    "msb": {
+     "floor_m2": 2132355057.1217103,
+     "value_usd_adj": 687128124207.6617
+    }
+   }
+  },
+  "div_minus": {
+   "label": "storey divisor -0.25 m",
+   "models": {
+    "gba": {
+     "floor_m2": 2149877425.466835,
+     "value_usd_adj": 692868870239.0214
+    },
+    "overture": {
+     "floor_m2": 1940787431.072086,
+     "value_usd_adj": 625804605831.2539
+    },
+    "msb": {
+     "floor_m2": 1775460569.9646142,
+     "value_usd_adj": 572790583498.2542
+    }
+   }
+  },
+  "div_plus": {
+   "label": "storey divisor +0.25 m",
+   "models": {
+    "gba": {
+     "floor_m2": 1819648764.6397378,
+     "value_usd_adj": 586447311290.8757
+    },
+    "overture": {
+     "floor_m2": 1655180101.7589636,
+     "value_usd_adj": 533844975815.71844
+    },
+    "msb": {
+     "floor_m2": 1502754261.6028636,
+     "value_usd_adj": 484816162375.888
+    }
+   }
+  }
+ },
+ "models": {
+  "giri": {
+   "label": "GIRI BEM (UNEP/GRID)",
+   "vintage": "~2023 (2018 US$)",
+   "value": {
+    "total": "giri_total_usd"
+   },
+   "sub": {
+    "res": "giri_res_usd",
+    "nres": "giri_nres_usd"
+   },
+   "floor": null,
+   "breakdown": {
+    "value": [
+     [
+      "giri_res_usd",
+      "residential"
+     ],
+     [
+      "giri_nres_usd",
+      "non-res"
+     ]
+    ]
+   },
+   "note": "Capital stock of buildings (structures, no contents), 5 km cells assigned by largest overlap. Residential / non-residential layers; no urban/rural split.",
+   "docs": "https://giri.unepgrid.ch/sites/default/files/2023-09/GIRI_BEM_report_UNIGE.pdf"
+  },
+  "gem2023": {
+   "label": "GEM v2023.1.1",
+   "vintage": "2023 (2021 US$)",
+   "value": {
+    "total": "gem23_bldg_repl_usd"
+   },
+   "floor": {
+    "total": "gem23_floor_area_m2"
+   },
+   "breakdown": {
+    "value": [
+     [
+      "gem23_res_usd",
+      "residential"
+     ],
+     [
+      "gem23_com_usd",
+      "commercial"
+     ],
+     [
+      "gem23_ind_usd",
+      "industrial"
+     ]
+    ],
+    "floor": [
+     [
+      "gem23_res_floor_m2",
+      "residential"
+     ],
+     [
+      "gem23_com_floor_m2",
+      "commercial"
+     ],
+     [
+      "gem23_ind_floor_m2",
+      "industrial"
+     ]
+    ]
+   },
+   "note": "June 2023 GEM release: building replacement cost (structural + non-structural, excl. contents). GEM regions matched to the display units by region name. No urban/rural split in this release.",
+   "docs": "https://onlinelibrary.wiley.com/doi/10.1177/87552930231194048"
+  },
+  "gem2026": {
+   "label": "GEM v2026.0.0",
+   "vintage": "2026 (2024 US$)",
+   "value": {
+    "total": "gem26_bldg_repl_usd",
+    "urban": "gem26_res_urban_usd",
+    "rural": "gem26_res_rural_usd"
+   },
+   "floor": {
+    "total": "gem26_floor_area_m2",
+    "urban": "gem26_res_urban_floor_m2",
+    "rural": "gem26_res_rural_floor_m2"
+   },
+   "split_note": "urban/rural covers RESIDENTIAL only",
+   "breakdown": {
+    "value": [
+     [
+      "gem26_res_usd",
+      "residential"
+     ],
+     [
+      "gem26_com_usd",
+      "commercial"
+     ],
+     [
+      "gem26_ind_usd",
+      "industrial"
+     ]
+    ],
+    "floor": [
+     [
+      "gem26_res_floor_m2",
+      "residential"
+     ],
+     [
+      "gem26_com_floor_m2",
+      "commercial"
+     ],
+     [
+      "gem26_ind_floor_m2",
+      "industrial"
+     ]
+    ]
+   },
+   "note": "June 2026 GEM release: building replacement cost (structural + non-structural, excl. contents; costs re-based to 2024-25). GEM regions matched to the display units by region name. Urban/rural published for residential only.",
+   "docs": "https://github.com/gem/global_exposure_model/releases/tag/v2026.0.0"
+  },
+  "overture": {
+   "label": "Overture Maps",
+   "vintage": "2026-10 release",
+   "estimated_value": true,
+   "note": "Mapped footprints (OSM, Microsoft, Google); height / floors attributes are populated for only 3% of footprint area; floor area = reported heights where present + GBA-calibrated storey multipliers (GBA floor/footprint ratio per unit and urban/rural class) for the rest. Replacement value ESTIMATED as floor area x GEM-derived unit construction cost per unit (2024 US$, excl. contents).",
+   "value": {
+    "total": "overture_value_usd",
+    "urban": "overture_value_usd_urban",
+    "rural": "overture_value_usd_rural"
+   },
+   "floor": {
+    "total": "overture_floor_area_m2",
+    "urban": "overture_floor_area_m2_urban",
+    "rural": "overture_floor_area_m2_rural"
+   },
+   "extra": {
+    "buildings": "overture_buildings",
+    "footprint": "overture_footprint_m2"
+   },
+   "breakdown": {
+    "value": [
+     [
+      "overture_value_usd_urban",
+      "urban"
+     ],
+     [
+      "overture_value_usd_rural",
+      "rural"
+     ]
+    ],
+    "floor": [
+     [
+      "overture_floor_area_m2_urban",
+      "urban"
+     ],
+     [
+      "overture_floor_area_m2_rural",
+      "rural"
+     ]
+    ]
+   },
+   "docs": "https://docs.overturemaps.org/guides/buildings/"
+  },
+  "gba": {
+   "label": "Global Building Atlas LoD1",
+   "vintage": "~2024",
+   "estimated_value": true,
+   "note": "Footprints + modelled heights (TUM LoD1); floor area via the 3-tier storey divisor; missing heights = 1 storey. Calibrates the other footprint sources. Replacement value ESTIMATED as floor area x GEM-derived unit construction cost per unit (2024 US$, excl. contents).",
+   "value": {
+    "total": "gba_value_usd",
+    "urban": "gba_value_usd_urban",
+    "rural": "gba_value_usd_rural"
+   },
+   "floor": {
+    "total": "gba_floor_area_m2",
+    "urban": "gba_floor_area_m2_urban",
+    "rural": "gba_floor_area_m2_rural"
+   },
+   "extra": {
+    "buildings": "gba_buildings",
+    "footprint": "gba_footprint_m2"
+   },
+   "breakdown": {
+    "value": [
+     [
+      "gba_value_usd_urban",
+      "urban"
+     ],
+     [
+      "gba_value_usd_rural",
+      "rural"
+     ]
+    ],
+    "floor": [
+     [
+      "gba_floor_area_m2_urban",
+      "urban"
+     ],
+     [
+      "gba_floor_area_m2_rural",
+      "rural"
+     ]
+    ]
+   },
+   "docs": "https://essd.copernicus.org/articles/17/6647/2025/essd-17-6647-2025.html"
+  },
+  "msb": {
+   "label": "Microsoft Buildings",
+   "vintage": "2026-02 release",
+   "estimated_value": true,
+   "note": "Native Microsoft GlobalML footprints. The height field is essentially never populated; floor area = reported heights where present + GBA-calibrated storey multipliers (GBA floor/footprint ratio per unit and urban/rural class) for the rest. Replacement value ESTIMATED as floor area x GEM-derived unit construction cost per unit (2024 US$, excl. contents).",
+   "value": {
+    "total": "msb_value_usd",
+    "urban": "msb_value_usd_urban",
+    "rural": "msb_value_usd_rural"
+   },
+   "floor": {
+    "total": "msb_floor_area_m2",
+    "urban": "msb_floor_area_m2_urban",
+    "rural": "msb_floor_area_m2_rural"
+   },
+   "extra": {
+    "buildings": "msb_buildings",
+    "footprint": "msb_footprint_m2"
+   },
+   "breakdown": {
+    "value": [
+     [
+      "msb_value_usd_urban",
+      "urban"
+     ],
+     [
+      "msb_value_usd_rural",
+      "rural"
+     ]
+    ],
+    "floor": [
+     [
+      "msb_floor_area_m2_urban",
+      "urban"
+     ],
+     [
+      "msb_floor_area_m2_rural",
+      "rural"
+     ]
+    ]
+   },
+   "docs": "https://github.com/microsoft/GlobalMLBuildingFootprints"
+  }
+ },
+ "totals": {
+  "giri_total_usd": 476443670195.8784,
+  "giri_res_usd": 209342551341.28577,
+  "giri_nres_usd": 267101119036.41382,
+  "gem23_buildings": 7116917.799999744,
+  "gem23_floor_area_m2": 679954037.6748006,
+  "gem23_bldg_repl_usd": 380241797945.04083,
+  "gem23_res_usd": 303616235531.25,
+  "gem23_com_usd": 42710077912.35803,
+  "gem23_ind_usd": 33915484501.43282,
+  "gem23_res_floor_m2": 553016222.5500001,
+  "gem23_com_floor_m2": 67436965.12480062,
+  "gem23_ind_floor_m2": 59500850.0,
+  "gem26_buildings": 7392111.0,
+  "gem26_floor_area_m2": 731272450.0,
+  "gem26_bldg_repl_usd": 230967196792.0,
+  "gem26_contents_usd": 54483936550.0,
+  "gem26_res_urban_usd": 154524856261.0,
+  "gem26_res_rural_usd": 9119506245.0,
+  "gem26_res_urban_floor_m2": 499863616.0,
+  "gem26_res_rural_floor_m2": 62844015.0,
+  "gem26_res_usd": 163644362506.0,
+  "gem26_com_usd": 42130885338.0,
+  "gem26_ind_usd": 25191948948.0,
+  "gem26_res_floor_m2": 562707631.0,
+  "gem26_com_floor_m2": 89633879.0,
+  "gem26_ind_floor_m2": 78930940.0,
+  "overture_buildings": 10857512.0,
+  "overture_footprint_m2": 1155438064.1736784,
+  "overture_floor_known_m2": 81476574.20159549,
+  "overture_fp_unknown_m2": 1123700226.6076276,
+  "overture_buildings_urban": 6944081.0,
+  "overture_footprint_m2_urban": 791592945.6443088,
+  "overture_floor_known_m2_urban": 76692238.1325833,
+  "overture_fp_unknown_m2_urban": 764034835.494348,
+  "overture_buildings_rural": 3913431.0,
+  "overture_footprint_m2_rural": 363845118.52936983,
+  "overture_floor_known_m2_rural": 4784336.069012171,
+  "overture_fp_unknown_m2_rural": 359665391.1132795,
+  "gba_buildings": 14414723.0,
+  "gba_footprint_m2": 1295887378.913924,
+  "gba_volume_m3": 5924036635.754508,
+  "gba_floor_area_m2": 1971025296.8135388,
+  "gba_floor_floor_m2": 1652962425.5520957,
+  "gba_floor_ceil_m2": 2585209211.574177,
+  "gba_volume_t1_m3": 5781944780.374738,
+  "gba_volume_t2_m3": 141627716.0621472,
+  "gba_volume_t3_m3": 464139.3176242787,
+  "gba_missing_height": 1153166.0,
+  "gba_buildings_urban": 9813070.0,
+  "gba_footprint_m2_urban": 907378149.2504781,
+  "gba_volume_m3_urban": 4482631374.353268,
+  "gba_floor_area_m2_urban": 1490767880.787612,
+  "gba_floor_floor_m2_urban": 1211629433.6893444,
+  "gba_floor_ceil_m2_urban": 1919859825.098625,
+  "gba_volume_t1_m3_urban": 4348768692.178463,
+  "gba_volume_t2_m3_urban": 133398542.85718073,
+  "gba_volume_t3_m3_urban": 464139.3176242787,
+  "gba_missing_height_urban": 701452.0,
+  "gba_buildings_rural": 4601653.0,
+  "gba_footprint_m2_rural": 388509229.6634456,
+  "gba_volume_m3_rural": 1441405261.4012399,
+  "gba_floor_area_m2_rural": 480257416.02592695,
+  "gba_floor_floor_m2_rural": 441332991.86275136,
+  "gba_floor_ceil_m2_rural": 665349386.4755518,
+  "gba_volume_t1_m3_rural": 1433176088.1962733,
+  "gba_volume_t2_m3_rural": 8229173.20496646,
+  "gba_volume_t3_m3_rural": 0.0,
+  "gba_missing_height_rural": 451714.0,
+  "msb_buildings": 7758467.0,
+  "msb_footprint_m2": 1068144239.2089543,
+  "msb_floor_known_m2": 0.0,
+  "msb_fp_unknown_m2": 1068144239.2089543,
+  "msb_buildings_urban": 4965660.0,
+  "msb_footprint_m2_urban": 750731333.1092639,
+  "msb_floor_known_m2_urban": 0.0,
+  "msb_fp_unknown_m2_urban": 750731333.1092639,
+  "msb_buildings_rural": 2792807.0,
+  "msb_footprint_m2_rural": 317412906.09969044,
+  "msb_floor_known_m2_rural": 0.0,
+  "msb_fp_unknown_m2_rural": 317412906.09969044,
+  "overture_floor_area_m2": 1786101807.4235024,
+  "overture_floor_area_m2_urban": 1330055961.023849,
+  "overture_floor_area_m2_rural": 449193988.8418117,
+  "msb_floor_area_m2": 1627763040.589629,
+  "msb_floor_area_m2_urban": 1235728853.593454,
+  "msb_floor_area_m2_rural": 392162542.9935043,
+  "overture_value_usd": 560303806209.3064,
+  "overture_value_usd_urban": 419649292969.93384,
+  "overture_value_usd_rural": 138520302020.57593,
+  "gba_value_usd": 617921649171.2195,
+  "gba_value_usd_urban": 469786476846.47614,
+  "gba_value_usd_rural": 148135172324.74335,
+  "msb_value_usd": 510834231884.82,
+  "msb_value_usd_urban": 390076413823.2991,
+  "msb_value_usd_rural": 120853051616.4795,
+  "giri_total_usd_adj": 600575157623.6521,
+  "giri_res_usd_adj": 263884155953.71634,
+  "giri_nres_usd_adj": 336691001899.1281,
+  "gem23_bldg_repl_usd_adj": 444966348679.2223,
+  "gem23_res_usd_adj": 355297624969.6724,
+  "gem23_com_usd_adj": 49980163998.73515,
+  "gem23_ind_usd_adj": 39688559710.81476,
+  "gem26_bldg_repl_usd_adj": 237437132625.4312,
+  "gem26_contents_usd_adj": 56010160093.11505,
+  "gem26_res_urban_usd_adj": 158853461874.97903,
+  "gem26_res_rural_usd_adj": 9374965119.927856,
+  "gem26_res_usd_adj": 168228426994.9069,
+  "gem26_com_usd_adj": 43311070786.53356,
+  "gem26_ind_usd_adj": 25897634843.990753,
+  "overture_value_usd_adj": 575999237091.927,
+  "overture_value_usd_urban_adj": 431404659254.72,
+  "overture_value_usd_rural_adj": 142400582329.41882,
+  "gba_value_usd_adj": 635231091705.7201,
+  "gba_value_usd_urban_adj": 482946303881.77454,
+  "gba_value_usd_rural_adj": 152284787823.94553,
+  "msb_value_usd_adj": 525143903334.7936,
+  "msb_value_usd_urban_adj": 401003374026.4162,
+  "msb_value_usd_rural_adj": 124238430579.78369
+ }
+}
